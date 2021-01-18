@@ -1,1 +1,1 @@
-# IT3708-Bio-AI
+# IT3708 Bio-insipred Artificial Intelligence
