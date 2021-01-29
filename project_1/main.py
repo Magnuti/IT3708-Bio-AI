@@ -230,6 +230,7 @@ def run_lin_reg():
 
     population = generate_init_population(POPULATION_SIZE, FEATURES)
 
+    # TODO maybe break when score is < 0.124
     for i in range(100):
         # We use 1/(x**2) because we want to use lower scores as the best scores,
         # which makes it easier to use them as cumulative weights in roulette wheel selection.
