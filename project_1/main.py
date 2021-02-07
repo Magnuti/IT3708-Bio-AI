@@ -68,14 +68,30 @@ def parent_selection_roulette_wheel(population, number_of_parents, fitness_funct
     return mating_pool
 
 
-def parent_selection_tournament():
-    # Implement if you have time, not necessary unless you are a group of two.
-    raise NotImplementedError()
+def parent_selection_tournament(population, number_of_parents, fitness_function, k, want_highest_scores):
+    mating_pool = []
+    for _ in range(number_of_parents):
+        # competitors = random.choices(population, k=k)
+        competitors = random.sample(population, k)
+        population_scores = get_population_scores(
+            competitors, fitness_function)
+        if(want_highest_scores):
+            top_score = max(population_scores.values())
+        else:
+            top_score = min(population_scores.values())
+
+        for key, value in population_scores.items():
+            if value == top_score:
+                mating_pool.append(key)
+                break
+
+    return mating_pool
 
 
 def create_offsprings(parent_0, parent_1, crossover_rate, mutation_chance):
     '''
-    Creates two offspring from two parents through crossover given by a crossover rate. Each offspring has a mutation chance.
+    Creates two offspring from two parents through crossover given by a crossover rate.
+    Each offspring has a mutation chance.
 
     Returns a tuple with the offspring.
     '''
@@ -227,9 +243,9 @@ def score_print(generation, fitness_function, population):
 
 
 def run_genetic_algorithm(population_size, features, crossover_rate, mutation_rate, fitness_function,
-                          max_generation_number, parent_selection_function,
-                          survivor_selection_function, want_highest_scores=True, cumulative_weight_scaler=lambda x: x,
-                          plot_function=None, verbose=False, stop_at_score=None):
+                          max_generation_number, parent_selection_function, k,
+                          survivor_selection_function, want_highest_scores=True,
+                          cumulative_weight_scaler=lambda x: x, plot_function=None, verbose=False, stop_at_score=None):
     population = generate_init_population(population_size, features)
     entropy_history = np.empty(max_generation_number)
 
@@ -239,8 +255,12 @@ def run_genetic_algorithm(population_size, features, crossover_rate, mutation_ra
     # TODO stop at some stop criteria (gen number, fitnes score etc.)
     for i in range(max_generation_number):
         if survivor_selection_function == survivor_selection_fitness:
-            parents = parent_selection_roulette_wheel(
-                population, population_size, fitness_function, cumulative_weight_scaler)
+            if(parent_selection_function == parent_selection_roulette_wheel):
+                parents = parent_selection_function(
+                    population, population_size, fitness_function, cumulative_weight_scaler)
+            elif(parent_selection_function == parent_selection_tournament):
+                parents = parent_selection_tournament(
+                    population, population_size, fitness_function, k, want_highest_scores)
 
             offsprings = get_offsprings(parents, crossover_rate, mutation_rate)
 
@@ -248,25 +268,32 @@ def run_genetic_algorithm(population_size, features, crossover_rate, mutation_ra
                 population, offsprings, population_size, fitness_function, want_highest_scores)
 
         elif survivor_selection_function == survivor_selection_deterministic_crowding:
-            for _ in range(0, population_size // 2, 2):
-                old_parents = parent_selection_roulette_wheel(
-                    population, 2, fitness_function, cumulative_weight_scaler, only_unique=True)
+            new_population = []
+            for _ in range(population_size // 2):
+                if(parent_selection_function == parent_selection_roulette_wheel):
+                    parents = parent_selection_function(
+                        population, 2, fitness_function, cumulative_weight_scaler, only_unique=True)
+                elif(parent_selection_function == parent_selection_tournament):
+                    parents = parent_selection_tournament(
+                        population, 2, fitness_function, k, want_highest_scores)
 
                 offsprings = get_offsprings(
-                    old_parents, crossover_rate, mutation_rate)
+                    parents, crossover_rate, mutation_rate)
 
                 survivors = survivor_selection_deterministic_crowding(
-                    old_parents, offsprings, fitness_function, want_highest_scores)
+                    parents, offsprings, fitness_function, want_highest_scores)
 
-                for individual in old_parents:
-                    population.remove(individual)
+                new_population.extend(survivors)
 
-                for individual in survivors:
-                    population.append(individual)
+            population = new_population
 
         elif survivor_selection_function == survivor_selection_generational:
-            parents = parent_selection_roulette_wheel(
-                population, population_size, fitness_function, cumulative_weight_scaler)
+            if(parent_selection_function == parent_selection_roulette_wheel):
+                parents = parent_selection_function(
+                    population, population_size, fitness_function, cumulative_weight_scaler)
+            elif(parent_selection_function == parent_selection_tournament):
+                parents = parent_selection_tournament(
+                    population, population_size, fitness_function, k, want_highest_scores)
 
             offsprings = get_offsprings(parents, crossover_rate, mutation_rate)
 
@@ -302,7 +329,7 @@ if __name__ == "__main__":
         crossover_rate = 0.7  # Between 0.6-0.8 (page 100 Eiben/Smith)
         # mutation_rate should be between 1/features and 1/population_size (page 100 Eiben/Smith)
         mutation_rate = 0.02
-        max_generation_number = 100
+        max_generation_number = 50
 
         max_sin_range = 128
         # Scales integers down from [0, 2**features] to [0, max_sin_range]
@@ -339,16 +366,16 @@ if __name__ == "__main__":
             return fitness_cache[individual]
 
         sga_entropy, best_individual_sga = run_genetic_algorithm(population_size, features, crossover_rate, mutation_rate, fitness_function_sin,
-                                                                 max_generation_number, parent_selection_roulette_wheel, survivor_selection_fitness,
-                                                                 plot_function=plot_sin_population, verbose=True)
+                                                                 max_generation_number, parent_selection_roulette_wheel, 10, survivor_selection_fitness,
+                                                                 plot_function=plot_sin_population, verbose=False)
 
         crossover_rate = 0.7  # Between 0.6-0.8 (page 100 Eiben/Smith)
         # mutation_rate should be between 1/features and 1/population_size (page 100 Eiben/Smith)
-        mutation_rate = 0.066
-        max_generation_number = 100
+        mutation_rate = 0.02
+        max_generation_number = 50
         crowding_entropy, best_individual_crowding = run_genetic_algorithm(population_size, features, crossover_rate, mutation_rate, fitness_function_sin,
-                                                                           max_generation_number, parent_selection_roulette_wheel,
-                                                                           survivor_selection_deterministic_crowding, plot_function=plot_sin_population, verbose=True)
+                                                                           max_generation_number, parent_selection_roulette_wheel, 10,
+                                                                           survivor_selection_deterministic_crowding, plot_function=plot_sin_population, verbose=False)
 
         plot_entropy(sga_entropy, crowding_entropy)
         print("Best individual SGA: {} with a score of {}.\nBest individual crowding: {} with a score of {}".format(best_individual_sga,
@@ -384,7 +411,7 @@ if __name__ == "__main__":
         # We use 1/(x**2) because we want to use lower scores as the best scores,
         # # which makes it easier to use them as cumulative weights in roulette wheel selection.
         sga_entropy, best_individual_sga = run_genetic_algorithm(population_size, features, crossover_rate, mutation_rate, fitness_function_lin_reg,
-                                                                 max_generation_number, parent_selection_roulette_wheel, survivor_selection_fitness,
+                                                                 max_generation_number, parent_selection_roulette_wheel, 5, survivor_selection_fitness,
                                                                  want_highest_scores=False, cumulative_weight_scaler=lambda x: 1/(x**2), verbose=True)
 
         # TODO maybe break when score is < 0.124
@@ -392,7 +419,7 @@ if __name__ == "__main__":
         # mutation_rate should be between 1/features and 1/population_size (page 100 Eiben/Smith)
         mutation_rate = 0.01
         crowding_entropy, best_individual_crowding = run_genetic_algorithm(population_size, features, crossover_rate, mutation_rate, fitness_function_lin_reg,
-                                                                           max_generation_number, parent_selection_roulette_wheel, survivor_selection_deterministic_crowding,
+                                                                           max_generation_number, parent_selection_roulette_wheel, 5, survivor_selection_deterministic_crowding,
                                                                            want_highest_scores=False, cumulative_weight_scaler=lambda x: 1/x, verbose=True)
 
         plot_entropy(sga_entropy, crowding_entropy)
