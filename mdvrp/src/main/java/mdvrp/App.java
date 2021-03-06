@@ -7,8 +7,17 @@ package mdvrp;
 public class App {
     public static void main(String[] args) {
         ProblemParser p = new ProblemParser();
-        String x = p.parseFile("p01");
+        p.parseFile("p01");
 
-        System.out.println(x);
+        System.out.println(p.maxVehicesPerDepot);
+        System.out.println(p.customerCount);
+        System.out.println(p.depotCount);
+
+        for (Depot depot : p.depots) {
+            System.out.println(depot);
+        }
+        for (Customer c : p.customers) {
+            System.out.println(c);
+        }
     }
 }
