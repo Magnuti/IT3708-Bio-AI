@@ -7,6 +7,7 @@ public class Customer {
     int y;
     int serviceDuration;
     int demand;
+    Depot depot;
 
     public Customer(int id, int x, int y, int serviceDuration, int demand) {
         this.id = id;
