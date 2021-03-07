@@ -10,5 +10,6 @@ public class App {
         problemParser.parseFile("p01");
         Solver solver = new Solver(problemParser);
         solver.initDepotAssignment();
+        solver.routeSchedulingFirstPart();
     }
 }

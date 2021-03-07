@@ -39,6 +39,8 @@ public class ProblemParser {
                 } else if (lineCounter < 1 + this.depotCount) {
                     this.depots.add(new Depot(numbers.get(0), numbers.get(1)));
                 } else if (lineCounter < 1 + this.depotCount + this.customerCount) {
+                    // TODO ask about whether index 3 (service duration) is required for this assignment
+                    // TODO all problem sets have this value set to 0.
                     this.customers.add(new Customer(numbers.get(0), numbers.get(1), numbers.get(2), numbers.get(3),
                             numbers.get(4)));
                 } else {

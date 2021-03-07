@@ -6,8 +6,7 @@ public class Customer {
     int x;
     int y;
     int serviceDuration;
-    int demand;
-    Depot depot;
+    int demand; // Demand means how much capacity this customer requires in a vehicle/route
 
     public Customer(int id, int x, int y, int serviceDuration, int demand) {
         this.id = id;
