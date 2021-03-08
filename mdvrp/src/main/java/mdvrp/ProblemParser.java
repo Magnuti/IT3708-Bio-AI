@@ -24,7 +24,7 @@ public class ProblemParser {
 
     public void parseFile(String fileName) {
         try {
-            Path path = Paths.get("data", fileName);
+            Path path = Paths.get("test_data", fileName);
             File myObj = new File(path.toString());
             Scanner scanner = new Scanner(myObj);
 

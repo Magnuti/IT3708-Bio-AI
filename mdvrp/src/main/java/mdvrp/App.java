@@ -11,5 +11,6 @@ public class App {
         Solver solver = new Solver(problemParser);
         solver.initDepotAssignment();
         solver.routeSchedulingFirstPart();
+        solver.save();
     }
 }

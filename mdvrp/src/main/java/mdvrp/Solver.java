@@ -1,9 +1,14 @@
 package mdvrp;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
 
 public class Solver {
     int maxVehicesPerDepot;
@@ -39,6 +44,65 @@ public class Solver {
             bestDepot.customers.add(customer);
 
             // TODO add borderline cases as described in section 3.9
+        }
+    }
+
+    double getRouteLength(Depot depot, List<Customer> route) {
+        double length = 0.0;
+        int fromX = depot.x;
+        int fromY = depot.y;
+        for (Customer customer : depot.customers) {
+            length += euclidianDistance(fromX, fromY, customer.x, customer.y);
+            fromX = customer.x;
+            fromY = customer.y;
+        }
+        length += euclidianDistance(fromX, fromY, depot.x, depot.y);
+        return length;
+    }
+
+    public void save() {
+        try {
+            Path path = Paths.get("solutions");
+            System.out.println(path.toAbsolutePath());
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+            }
+            path = Paths.get(path.toString(), "solution.res");
+            if (!Files.exists(path)) {
+                Files.createFile(path);
+            }
+            FileWriter fr = new FileWriter(path.toString());
+            double totalRouteLength = 0.0;
+            for (Depot depot : this.depots) {
+                totalRouteLength += depot.routes.stream().map(x -> getRouteLength(depot, x)).reduce(0.0, Double::sum);
+            }
+            fr.write(String.format(Locale.US, "%.2f", totalRouteLength));
+            fr.write(System.lineSeparator());
+            for (Depot depot : this.depots) {
+                for (int i = 0; i < depot.routes.size(); i++) {
+                    List<Customer> route = depot.routes.get(i);
+                    // for (List<Customer> customers : depot.routes){
+                    fr.write(Integer.toString(depot.id));
+                    fr.write("\t");
+                    fr.write(Integer.toString(i + 1));
+                    fr.write("\t");
+                    double routeLength = getRouteLength(depot, route);
+                    fr.write(String.format(Locale.US, "%.2f", routeLength));
+                    fr.write("\t");
+                    fr.write(Integer.toString(route.stream().map(x -> x.demand).reduce(0, Integer::sum)));
+                    fr.write("\t");
+                    fr.write(Integer.toString(depot.id));
+                    fr.write("\t");
+                    for (Customer c : route) {
+                        fr.write(Integer.toString(c.id));
+                        fr.write(" ");
+                    }
+                    fr.write(System.lineSeparator());
+                }
+            }
+            fr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
