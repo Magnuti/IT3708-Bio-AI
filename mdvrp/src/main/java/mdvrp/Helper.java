@@ -5,6 +5,8 @@ import java.lang.reflect.Field;
 // From
 // https://stackoverflow.com/questions/1526826/printing-all-variables-value-from-a-class
 
+// TODO I broke this when making variables private..
+
 public class Helper {
     static String getClassValuesAsString(Object o) {
         StringBuilder result = new StringBuilder();

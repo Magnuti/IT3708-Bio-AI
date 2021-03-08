@@ -10,7 +10,8 @@ public class App {
         problemParser.parseFile("p01");
         Solver solver = new Solver(problemParser);
         solver.initDepotAssignment();
-        solver.routeSchedulingFirstPart();
-        solver.save();
+        solver.initPopulation(6);
+        solver.runGA(3);
+        solver.saveBest();
     }
 }

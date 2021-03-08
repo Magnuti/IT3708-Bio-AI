@@ -39,16 +39,16 @@ public class ProblemParser {
                 } else if (lineCounter < 1 + this.depotCount) {
                     this.depots.add(new Depot(numbers.get(0), numbers.get(1)));
                 } else if (lineCounter < 1 + this.depotCount + this.customerCount) {
-                    // TODO ask about whether index 3 (service duration) is required for this assignment
+                    // TODO ask about whether index 3 (service duration) is required for this
+                    // TODO assignment
                     // TODO all problem sets have this value set to 0.
                     this.customers.add(new Customer(numbers.get(0), numbers.get(1), numbers.get(2), numbers.get(3),
                             numbers.get(4)));
                 } else {
                     int index = lineCounter - (1 + this.depotCount + this.customerCount);
                     Depot depot = this.depots.get(index);
-                    depot.id = lineCounter - (this.depotCount + this.customerCount);
-                    depot.x = numbers.get(1);
-                    depot.y = numbers.get(2);
+                    depot.initDepotSecond(lineCounter - (this.depotCount + this.customerCount), numbers.get(1),
+                            numbers.get(2));
                     this.depots.set(index, depot);
                 }
                 lineCounter++;
