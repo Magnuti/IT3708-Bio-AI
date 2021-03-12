@@ -1,6 +1,8 @@
 package mdvrp;
 
 import java.lang.reflect.Field;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 // From
 // https://stackoverflow.com/questions/1526826/printing-all-variables-value-from-a-class
@@ -10,6 +12,10 @@ import java.lang.reflect.Field;
 public class Helper {
     static double euclidianDistance(int x1, int y1, int x2, int y2) {
         return Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
+    }
+
+    static <T> T getRandomElementFromList(List<T> list) {
+        return list.get(ThreadLocalRandom.current().nextInt(list.size()));
     }
 
     static String getClassValuesAsString(Object o) {

@@ -6,11 +6,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import java.util.Collections;
 
 public class Solver {
     int maxVehicesPerDepot;
@@ -28,17 +29,14 @@ public class Solver {
         this.customers = problemParser.customers;
     }
 
-    double euclidianDistance(int x1, int y1, int x2, int y2) {
-        return Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
-    }
-
     public void initDepotAssignment() {
         // TODO parallellize this
         for (Customer customer : this.customers) {
             double lowestDistance = Double.POSITIVE_INFINITY;
             Depot bestDepot = null;
             for (Depot depot : this.depots) {
-                double distance = euclidianDistance(depot.getX(), depot.getY(), customer.getX(), customer.getY());
+                double distance = Helper.euclidianDistance(depot.getX(), depot.getY(), customer.getX(),
+                        customer.getY());
                 if (distance < lowestDistance) {
                     lowestDistance = distance;
                     bestDepot = depot;
@@ -59,11 +57,14 @@ public class Solver {
         }
         for (int i = 0; i < populationSize; i++) {
             // We need to clone depots to the different chromosomes
-            List<Depot> depotsCopy = new ArrayList<>();
+            List<Depot> depots = new ArrayList<>();
             for (Depot depot : this.depots) {
-                depotsCopy.add(new Depot(depot));
+                Depot depotToAdd = new Depot(depot);
+                // Initialize random routes for each depot per chromosome
+                Collections.shuffle(depotToAdd.customers);
+                depots.add(depotToAdd);
             }
-            Chromosome chromosome = new Chromosome(depotsCopy);
+            Chromosome chromosome = new Chromosome(depots);
             chromosome.routeSchedulingFirstPart();
             this.population.add(chromosome);
         }
@@ -118,7 +119,7 @@ public class Solver {
         }
     }
 
-    public Chromosome[] tournamentSelection(int selection_size) {
+    Chromosome[] tournamentSelection(int selection_size) {
         Chromosome[] winners = new Chromosome[selection_size];
         int tournamentSize = 2; // Binary tournament
         for (int i = 0; i < selection_size; i++) {
@@ -193,6 +194,7 @@ public class Solver {
                         }
                     }
                     bestRoute.customers.add(bestInsertionIndex, customer);
+                    // depotToModify.recalculateUsedRouteLengthAndCapacity(bestRoute); // ?
                 } else {
                     // Create new route
                     Route route = new Route();
@@ -208,7 +210,7 @@ public class Solver {
         }
     }
 
-    public Chromosome[] crossover(Chromosome parent1, Chromosome parent2, double crossoverChance) {
+    Chromosome[] crossover(Chromosome parent1, Chromosome parent2, double crossoverChance) {
         Chromosome offspring1 = new Chromosome(parent1);
         Chromosome offspring2 = new Chromosome(parent2);
 
@@ -257,31 +259,134 @@ public class Solver {
         return offsprings;
     }
 
-    public List<Chromosome> elitism(List<Chromosome> newPopulation, double ratio) {
+    void intraDepotMutation(Depot depot) {
+        switch (ThreadLocalRandom.current().nextInt(3)) {
+        case 0:
+            reversalMutation(depot);
+            break;
+        case 1:
+            singleCustomerReRouting(depot);
+            break;
+        case 2:
+            swapping(depot);
+            break;
+        default:
+            throw new Error();
+        }
+    }
+
+    void reversalMutation(Depot depot) {
+        depot.rebuildCustomerList();
+        int startIndex = ThreadLocalRandom.current().nextInt(depot.customers.size());
+        int endIndex = startIndex + 1 + ThreadLocalRandom.current().nextInt(depot.customers.size() - startIndex);
+        List<Customer> toReverse = depot.customers.subList(startIndex, endIndex);
+        int reverseIndex = toReverse.size() - 1;
+        for (int i = startIndex; i < endIndex; i++) {
+            depot.customers.set(i, toReverse.get(reverseIndex));
+            reverseIndex--;
+        }
+        depot.routeSchedulingFirstPart();
+        depot.routeSchedulingSecondPart();
+    }
+
+    void singleCustomerReRouting(Depot depot) {
+        // depot.rebuildCustomerList(); // ?
+
+        Customer customer = Helper.getRandomElementFromList(depot.customers);
+        // depot.customers.remove(customer); // ?
+        for (Route route : depot.routes) {
+            route.customers.remove(customer);
+        }
+
+        List<List<Double>> insertionCost = new ArrayList<>();
+        List<List<Boolean>> maintainsFeasibility = new ArrayList<>();
+        for (Route route : depot.routes) {
+            List<Double> routeInsertionCost = new ArrayList<>();
+            List<Boolean> routeMaintainsFeasibility = new ArrayList<>();
+            for (int i = 0; i < route.customers.size() + 1; i++) {
+                route.customers.add(i, customer);
+                depot.recalculateUsedRouteLengthAndCapacity(route);
+                routeInsertionCost.add(route.routeLength);
+                if (route.routeLength <= depot.getMaxRouteDuration()
+                        && route.usedCapacity <= depot.getMaxVehicleLoad()) {
+                    routeMaintainsFeasibility.add(true);
+                } else {
+                    routeMaintainsFeasibility.add(false);
+                }
+                route.customers.remove(customer);
+            }
+            insertionCost.add(routeInsertionCost);
+            maintainsFeasibility.add(routeMaintainsFeasibility);
+            depot.recalculateUsedRouteLengthAndCapacity(route); // TODO maybe cache this instead of
+        }
+        double bestInsertionCost = Double.POSITIVE_INFINITY;
+        Route bestRoute = null;
+        int bestInsertionIndex = 0;
+        for (int i = 0; i < insertionCost.size(); i++) {
+            for (int k = 0; k < insertionCost.get(i).size(); k++) {
+                if (maintainsFeasibility.get(i).get(k)) {
+                    if (insertionCost.get(i).get(k) < bestInsertionCost) {
+                        bestInsertionCost = insertionCost.get(i).get(k);
+                        bestRoute = depot.routes.get(i);
+                        bestInsertionIndex = k;
+                    }
+                }
+            }
+        }
+        bestRoute.customers.add(bestInsertionIndex, customer);
+    }
+
+    void swapping(Depot depot) {
+        // ? This allows route1.equal(route2), is it OK?
+        Route route1 = Helper.getRandomElementFromList(depot.routes);
+        Route route2 = Helper.getRandomElementFromList(depot.routes);
+        Customer customer1 = Helper.getRandomElementFromList(route1.customers);
+        Customer customer2 = Helper.getRandomElementFromList(route2.customers);
+        route1.customers.remove(customer1);
+        route2.customers.remove(customer2);
+        route1.customers.add(customer2);
+        route2.customers.add(customer1);
+        depot.routeSchedulingFirstPart();
+        depot.routeSchedulingSecondPart();
+    }
+
+    void interDepotMutation(Chromosome chromosome) {
+
+    }
+
+    List<Chromosome> elitism(List<Chromosome> newPopulation, double ratio) {
         // TODO replace some of the chromosones in offsprings with some of the fittest
         // from this.population
         return newPopulation;
     }
 
-    public void createNewPopulation() {
-        double crossoverChance = 0.7; // TODO
-        List<Chromosome> newPopulation = new ArrayList<>();
-        for (int i = 0; i < this.population.size() / 2; i++) {
-            Chromosome[] parents = tournamentSelection(2); // TODO make parent into array
-            Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
-            offsprings[0].mutate();
-            offsprings[1].mutate();
-            newPopulation.add(offsprings[0]);
-            newPopulation.add(offsprings[1]);
-        }
-        newPopulation = elitism(newPopulation, 0.01);
-        this.population = newPopulation;
-    }
-
     public void runGA(int maxGeneration) {
+        Random rand = new Random();
+        double crossoverChance = 0.7; // TODO
         System.out.println("Population size:" + this.population.size());
-        for (int i = 0; i < maxGeneration; i++) {
-            createNewPopulation();
+        for (int generation = 0; generation < maxGeneration; generation++) {
+            List<Chromosome> newPopulation = new ArrayList<>();
+            for (int i = 0; i < this.population.size() / 2; i++) {
+                Chromosome[] parents = tournamentSelection(2); // TODO make parent into array
+                Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
+                if (generation % 10 == 0) {
+                    // Apply inter-depot mutation every 10th generation
+                    interDepotMutation(offsprings[0]);
+                    interDepotMutation(offsprings[1]);
+                } else {
+                    // Intra-depot mutation
+                    // Selects a random depot to perform mutation on
+                    int depotIndex = rand.nextInt(offsprings[0].depots.size());
+                    intraDepotMutation(offsprings[0].depots.get(depotIndex));
+                    depotIndex = rand.nextInt(offsprings[1].depots.size());
+                    intraDepotMutation(offsprings[1].depots.get(depotIndex));
+
+                }
+                newPopulation.add(offsprings[0]);
+                newPopulation.add(offsprings[1]);
+            }
+            newPopulation = elitism(newPopulation, 0.01);
+            this.population = newPopulation;
             double bestFitness = Double.NEGATIVE_INFINITY;
             for (Chromosome chromosome : this.population) {
                 chromosome.updateFitnessByWeightedSum();

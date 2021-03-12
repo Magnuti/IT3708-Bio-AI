@@ -42,6 +42,85 @@ public class Depot {
         this.y = y;
     }
 
+    public void routeSchedulingFirstPart() {
+        this.routes.clear();
+
+        Route route = new Route();
+        int fromX = this.getX();
+        int fromY = this.getY();
+        double routeLength = 0.0;
+        double usedCapacity = 0.0;
+        Customer prevCustomer = null;
+        for (Customer customer : this.customers) {
+            double distance = Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
+            if (this.getMaxVehicleLoad() >= usedCapacity + customer.getDemand()
+                    && this.getMaxRouteDuration() >= routeLength + distance
+                            + Helper.euclidianDistance(customer.getX(), customer.getY(), this.getX(), this.getY())) {
+                route.customers.add(customer);
+                usedCapacity += customer.getDemand();
+                routeLength += distance;
+                fromX = customer.getX();
+                fromY = customer.getY();
+                prevCustomer = customer;
+            } else {
+                routeLength += Helper.euclidianDistance(prevCustomer.getX(), prevCustomer.getY(), this.getX(),
+                        this.getY()); // Distance back to the depot
+                route.routeLength = routeLength;
+                route.usedCapacity = usedCapacity;
+                this.routes.add(route);
+                route = new Route();
+                fromX = this.getX();
+                fromY = this.getY();
+                usedCapacity = customer.getDemand();
+                routeLength = distance;
+                route.customers.add(customer);
+                fromX = customer.getX();
+                fromY = customer.getY();
+
+                // * Skip sanity check for performance gain
+                if (usedCapacity > this.getMaxVehicleLoad() || routeLength > this.getMaxRouteDuration()) {
+                    throw new Error("A customer is invalid for a depot!");
+                }
+            }
+        }
+        route.routeLength = routeLength;
+        this.routes.add(route);
+    }
+
+    public void routeSchedulingSecondPart() {
+        // TODO
+    }
+
+    public List<Customer> getCustomers() {
+        this.customers.clear();
+        for (Route route : this.routes) {
+            for (Customer customer : route.customers) {
+                this.customers.add(customer);
+            }
+        }
+        return this.customers;
+    }
+
+    public void rebuildCustomerList() {
+        getCustomers();
+    }
+
+    public void recalculateUsedRouteLengthAndCapacity(Route route) {
+        int fromX = this.getX();
+        int fromY = this.getY();
+        double routeLength = 0.0;
+        double usedCapacity = 0.0;
+        for (Customer customer : route.customers) {
+            routeLength += Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
+            usedCapacity += customer.getDemand();
+            fromX = customer.getX();
+            fromY = customer.getY();
+        }
+        routeLength += Helper.euclidianDistance(fromX, fromY, this.getX(), this.getY());
+        route.routeLength = routeLength;
+        route.usedCapacity = usedCapacity;
+    }
+
     public int getId() {
         return this.id;
     }
@@ -60,22 +139,6 @@ public class Depot {
 
     public int getMaxVehicleLoad() {
         return this.maxVehicleLoad;
-    }
-
-    public void recalculateUsedRouteLengthAndCapacity(Route route) {
-        int fromX = this.getX();
-        int fromY = this.getY();
-        double routeLength = 0.0;
-        double usedCapacity = 0.0;
-        for (Customer customer : route.customers) {
-            routeLength += Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
-            usedCapacity += customer.getDemand();
-            fromX = customer.getX();
-            fromY = customer.getY();
-        }
-        routeLength += Helper.euclidianDistance(fromX, fromY, this.getX(), this.getY());
-        route.routeLength = routeLength;
-        route.usedCapacity = usedCapacity;
     }
 
     @Override
