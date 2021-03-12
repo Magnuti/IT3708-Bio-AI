@@ -30,7 +30,10 @@ public class Depot {
         this.x = depotToCopy.x;
         this.y = depotToCopy.y;
         this.customers = new ArrayList<>(depotToCopy.customers);
-        this.routes = new ArrayList<>(depotToCopy.routes);
+        this.routes = new ArrayList<>();
+        for (Route route : depotToCopy.routes) {
+            this.routes.add(new Route(route));
+        }
     }
 
     public void initDepotSecond(int id, int x, int y) {
@@ -57,6 +60,22 @@ public class Depot {
 
     public int getMaxVehicleLoad() {
         return this.maxVehicleLoad;
+    }
+
+    public void recalculateUsedRouteLengthAndCapacity(Route route) {
+        int fromX = this.getX();
+        int fromY = this.getY();
+        double routeLength = 0.0;
+        double usedCapacity = 0.0;
+        for (Customer customer : route.customers) {
+            routeLength += Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
+            usedCapacity += customer.getDemand();
+            fromX = customer.getX();
+            fromY = customer.getY();
+        }
+        routeLength += Helper.euclidianDistance(fromX, fromY, this.getX(), this.getY());
+        route.routeLength = routeLength;
+        route.usedCapacity = usedCapacity;
     }
 
     @Override

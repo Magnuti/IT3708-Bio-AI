@@ -6,9 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 public class Solver {
     int maxVehicesPerDepot;
@@ -101,10 +103,12 @@ public class Solver {
                     fr.write("\t");
                     fr.write(Integer.toString(depot.getId()));
                     fr.write("\t");
+                    fr.write("0 "); // Prepend 0 for compatibality reasons
                     for (Customer c : route.customers) {
                         fr.write(Integer.toString(c.getId()));
                         fr.write(" ");
                     }
+                    fr.write("0"); // Append 0 for compatibality reasons
                     fr.write(System.lineSeparator());
                 }
             }
@@ -114,44 +118,142 @@ public class Solver {
         }
     }
 
-    public List<Chromosome> tournamentSelection(int selection_size) {
-        List<Chromosome> winners = new ArrayList<>();
-        int k = 2; // Binary tournament
+    public Chromosome[] tournamentSelection(int selection_size) {
+        Chromosome[] winners = new Chromosome[selection_size];
+        int tournamentSize = 2; // Binary tournament
         for (int i = 0; i < selection_size; i++) {
-            List<Chromosome> tournamentSet = new ArrayList<>();
+            // selection_size number of tournaments
+            Chromosome[] tournamentSet = new Chromosome[tournamentSize];
             Random rand = new Random();
-            for (int j = 0; j < k; j++) {
+            for (int j = 0; j < tournamentSize; j++) {
                 int index = rand.nextInt(population.size());
-                tournamentSet.add(this.population.get(index));
+                tournamentSet[j] = this.population.get(index);
             }
 
             double r = rand.nextDouble();
-            if (r < 0.8) {
+            if (r < 0.8) { // TODO take as config parameter
                 // Add most fit parent
                 // ? Should maybe sort here to enable k > 2, but it may affect performance
-                if (tournamentSet.get(0).fitness >= tournamentSet.get(1).fitness) {
-                    winners.add(tournamentSet.get(0));
+                if (tournamentSet[0].fitness >= tournamentSet[1].fitness) {
+                    winners[i] = tournamentSet[0];
                 } else {
-                    winners.add(tournamentSet.get(1));
+                    winners[i] = tournamentSet[1];
                 }
             } else {
                 // Add random parent
-                int index = rand.nextInt(tournamentSet.size());
-                winners.add(tournamentSet.get(index));
+                int index = rand.nextInt(tournamentSet.length);
+                winners[i] = tournamentSet[index];
             }
         }
-
-        // TODO add elitism
-
         return winners;
     }
 
-    public List<Chromosome> crossover(Chromosome parent1, Chromosome parent2) {
-        // Returns 2 offspring ?
-        // TODO
-        List<Chromosome> offsprings = new ArrayList<>();
-        offsprings.add(parent1);
-        offsprings.add(parent2);
+    private void applyCrossoverOperations(List<Customer> customersToAdd, Depot depotToModify) {
+        for (Customer customer : customersToAdd) {
+            List<List<Double>> insertionCost = new ArrayList<>();
+            List<List<Boolean>> maintainsFeasibility = new ArrayList<>();
+            for (Route route : depotToModify.routes) {
+                List<Double> routeInsertionCost = new ArrayList<>();
+                List<Boolean> routeMaintainsFeasibility = new ArrayList<>();
+                for (int i = 0; i < route.customers.size() + 1; i++) {
+                    route.customers.add(i, customer);
+                    depotToModify.recalculateUsedRouteLengthAndCapacity(route);
+                    routeInsertionCost.add(route.routeLength);
+                    if (route.routeLength <= depotToModify.getMaxRouteDuration()
+                            && route.usedCapacity <= depotToModify.getMaxVehicleLoad()) {
+                        routeMaintainsFeasibility.add(true);
+                    } else {
+                        routeMaintainsFeasibility.add(false);
+                    }
+                    route.customers.remove(customer);
+                }
+                insertionCost.add(routeInsertionCost);
+                maintainsFeasibility.add(routeMaintainsFeasibility);
+                depotToModify.recalculateUsedRouteLengthAndCapacity(route); // TODO maybe cache this instead of
+            }
+
+            Random rand = new Random();
+            double dieRoll = rand.nextDouble();
+            dieRoll = rand.nextDouble();
+            if (dieRoll < 1.0) { // TODO set this as a config parameter
+                if (maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList()).contains(true)) {
+                    // Insert at best feasible location
+                    double bestInsertionCost = Double.POSITIVE_INFINITY;
+                    Route bestRoute = null;
+                    int bestInsertionIndex = 0;
+                    for (int i = 0; i < insertionCost.size(); i++) {
+                        for (int k = 0; k < insertionCost.get(i).size(); k++) {
+                            if (maintainsFeasibility.get(i).get(k)) {
+                                if (insertionCost.get(i).get(k) < bestInsertionCost) {
+                                    bestInsertionCost = insertionCost.get(i).get(k);
+                                    bestRoute = depotToModify.routes.get(i);
+                                    bestInsertionIndex = k;
+                                }
+                            }
+                        }
+                    }
+                    bestRoute.customers.add(bestInsertionIndex, customer);
+                } else {
+                    // Create new route
+                    Route route = new Route();
+                    route.customers.add(customer);
+                    depotToModify.routes.add(route);
+                    depotToModify.recalculateUsedRouteLengthAndCapacity(route);
+                }
+            } else {
+                // Insert at first entry in the list
+                // TODO
+            }
+
+        }
+    }
+
+    public Chromosome[] crossover(Chromosome parent1, Chromosome parent2, double crossoverChance) {
+        Chromosome offspring1 = new Chromosome(parent1);
+        Chromosome offspring2 = new Chromosome(parent2);
+
+        Random rand = new Random();
+        double dieRoll = rand.nextDouble();
+        Chromosome[] offsprings = new Chromosome[2];
+        if (dieRoll < crossoverChance) {
+            int index = rand.nextInt(offspring1.depots.size());
+            Depot depot1 = offspring1.depots.get(index);
+            index = rand.nextInt(offspring2.depots.size());
+            Depot depot2 = offspring2.depots.get(index);
+
+            index = rand.nextInt(depot1.routes.size());
+            Route route1 = depot1.routes.get(index);
+            index = rand.nextInt(depot2.routes.size());
+            Route route2 = depot2.routes.get(index);
+
+            for (Customer customer : route1.customers) {
+                depot2.customers.remove(customer);
+                for (Route route : depot2.routes) {
+                    route.customers.remove(customer);
+                    // ? Maybe use some trick here to remove calculate the distance between j-1 and
+                    // ? j+1 for the removed customer j, instead of recalculating the entire route.
+                    depot2.recalculateUsedRouteLengthAndCapacity(route);
+                }
+            }
+
+            for (Customer customer : route2.customers) {
+                depot1.customers.remove(customer);
+                for (Route route : depot1.routes) {
+                    route.customers.remove(customer);
+                    depot1.recalculateUsedRouteLengthAndCapacity(route);
+                }
+            }
+
+            applyCrossoverOperations(route1.customers, depot2);
+            applyCrossoverOperations(route2.customers, depot1);
+
+            offsprings[0] = offspring1;
+            offsprings[1] = offspring2;
+        } else {
+            // Return the parents
+            offsprings[0] = parent1;
+            offsprings[1] = parent2;
+        }
         return offsprings;
     }
 
@@ -162,33 +264,28 @@ public class Solver {
     }
 
     public void createNewPopulation() {
+        double crossoverChance = 0.7; // TODO
         List<Chromosome> newPopulation = new ArrayList<>();
         for (int i = 0; i < this.population.size() / 2; i++) {
-            List<Chromosome> parents = tournamentSelection(2);
-            List<Chromosome> offsprings = crossover(parents.get(0), parents.get(1));
-            for (Chromosome offspring : offsprings) {
-                offspring.mutate();
-            }
-            newPopulation.add(offsprings.get(0));
-            newPopulation.add(offsprings.get(1));
+            Chromosome[] parents = tournamentSelection(2); // TODO make parent into array
+            Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
+            offsprings[0].mutate();
+            offsprings[1].mutate();
+            newPopulation.add(offsprings[0]);
+            newPopulation.add(offsprings[1]);
         }
         newPopulation = elitism(newPopulation, 0.01);
         this.population = newPopulation;
     }
 
     public void runGA(int maxGeneration) {
-        // for (Chromosome chromosome : this.population) {
-        // chromosome.updateFitnessByWeightedSum();
-        // System.out.println(chromosome.fitness);
-        // }
+        System.out.println("Population size:" + this.population.size());
         for (int i = 0; i < maxGeneration; i++) {
-            System.out.println(this.population.size());
             createNewPopulation();
-            double bestFitness = 0.0;
+            double bestFitness = Double.NEGATIVE_INFINITY;
             for (Chromosome chromosome : this.population) {
                 chromosome.updateFitnessByWeightedSum();
-                System.out.println(chromosome.fitness);
-                if (chromosome.fitness < bestFitness) {
+                if (chromosome.fitness > bestFitness) {
                     bestFitness = chromosome.fitness;
                 }
             }

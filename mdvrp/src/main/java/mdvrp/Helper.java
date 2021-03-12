@@ -8,6 +8,10 @@ import java.lang.reflect.Field;
 // TODO I broke this when making variables private..
 
 public class Helper {
+    static double euclidianDistance(int x1, int y1, int x2, int y2) {
+        return Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
+    }
+
     static String getClassValuesAsString(Object o) {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
