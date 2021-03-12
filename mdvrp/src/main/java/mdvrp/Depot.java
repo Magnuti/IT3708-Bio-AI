@@ -11,6 +11,7 @@ public class Depot {
     private int y;
     // TODO encapsulate these
     List<Customer> customers = new ArrayList<>();
+    List<Customer> swappableCustomers = new ArrayList<>();
     List<Route> routes = new ArrayList<>();
 
     public Depot(int maxRouteDuration, int maxVehicleLoad) {
@@ -30,6 +31,7 @@ public class Depot {
         this.x = depotToCopy.x;
         this.y = depotToCopy.y;
         this.customers = new ArrayList<>(depotToCopy.customers);
+        this.swappableCustomers = new ArrayList<>(depotToCopy.swappableCustomers);
         this.routes = new ArrayList<>();
         for (Route route : depotToCopy.routes) {
             this.routes.add(new Route(route));

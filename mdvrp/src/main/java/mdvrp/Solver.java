@@ -44,7 +44,15 @@ public class Solver {
             }
             bestDepot.customers.add(customer);
 
-            // TODO add borderline cases as described in section 3.9
+            double bound = 2.0; // TODO take as config param
+            for (Depot depot : this.depots) {
+                double min = Helper.euclidianDistance(customer.getX(), customer.getY(), bestDepot.getX(),
+                        bestDepot.getY());
+                if ((Helper.euclidianDistance(customer.getX(), customer.getY(), depot.getX(), depot.getY()) - min)
+                        / min <= bound) {
+                    depot.swappableCustomers.add(customer);
+                }
+            }
         }
     }
 
@@ -135,7 +143,7 @@ public class Solver {
             if (r < 0.8) { // TODO take as config parameter
                 // Add most fit parent
                 // ? Should maybe sort here to enable k > 2, but it may affect performance
-                if (tournamentSet[0].fitness >= tournamentSet[1].fitness) {
+                if (tournamentSet[0].fitness <= tournamentSet[1].fitness) {
                     winners[i] = tournamentSet[0];
                 } else {
                     winners[i] = tournamentSet[1];
@@ -277,6 +285,9 @@ public class Solver {
 
     void reversalMutation(Depot depot) {
         depot.rebuildCustomerList();
+        if (depot.customers.isEmpty()) {
+            return;
+        }
         int startIndex = ThreadLocalRandom.current().nextInt(depot.customers.size());
         int endIndex = startIndex + 1 + ThreadLocalRandom.current().nextInt(depot.customers.size() - startIndex);
         List<Customer> toReverse = depot.customers.subList(startIndex, endIndex);
@@ -291,6 +302,9 @@ public class Solver {
 
     void singleCustomerReRouting(Depot depot) {
         // depot.rebuildCustomerList(); // ?
+        if (depot.customers.isEmpty()) {
+            return;
+        }
 
         Customer customer = Helper.getRandomElementFromList(depot.customers);
         // depot.customers.remove(customer); // ?
@@ -340,6 +354,9 @@ public class Solver {
         // ? This allows route1.equal(route2), is it OK?
         Route route1 = Helper.getRandomElementFromList(depot.routes);
         Route route2 = Helper.getRandomElementFromList(depot.routes);
+        if (route1.customers.isEmpty() || route2.customers.isEmpty()) {
+            return;
+        }
         Customer customer1 = Helper.getRandomElementFromList(route1.customers);
         Customer customer2 = Helper.getRandomElementFromList(route2.customers);
         route1.customers.remove(customer1);
@@ -351,6 +368,27 @@ public class Solver {
     }
 
     void interDepotMutation(Chromosome chromosome) {
+        List<Depot> depotsWithSwappableCustomers = chromosome.depots.stream()
+                .filter(x -> x.swappableCustomers.size() > 0).collect(Collectors.toList());
+        Depot toDepot = Helper.getRandomElementFromList(depotsWithSwappableCustomers);
+        Customer customerToSwap = Helper.getRandomElementFromList(toDepot.swappableCustomers);
+
+        // Remove customerToSwap from the depot which contains it
+        // ? This allows for the same depot to add/remove, OK?
+        for (Depot depot : chromosome.depots) {
+            boolean removed = depot.customers.remove(customerToSwap);
+            if (removed) {
+                depot.routeSchedulingFirstPart();
+                depot.routeSchedulingSecondPart();
+                // depot.rebuildCustomerList(); // ?
+                break;
+            }
+        }
+        // toDepot.rebuildCustomerList(); // ?
+
+        toDepot.customers.add(customerToSwap);
+        toDepot.routeSchedulingFirstPart();
+        toDepot.routeSchedulingSecondPart();
 
     }
 
@@ -363,14 +401,15 @@ public class Solver {
     public void runGA(int maxGeneration) {
         Random rand = new Random();
         double crossoverChance = 0.7; // TODO
+        int APPRATE = 10; // TODO take as config parameter
         System.out.println("Population size:" + this.population.size());
         for (int generation = 0; generation < maxGeneration; generation++) {
             List<Chromosome> newPopulation = new ArrayList<>();
             for (int i = 0; i < this.population.size() / 2; i++) {
                 Chromosome[] parents = tournamentSelection(2); // TODO make parent into array
                 Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
-                if (generation % 10 == 0) {
-                    // Apply inter-depot mutation every 10th generation
+                if (generation % APPRATE == 0) {
+                    // Apply inter-depot mutation every 10th generation for example
                     interDepotMutation(offsprings[0]);
                     interDepotMutation(offsprings[1]);
                 } else {
@@ -387,10 +426,10 @@ public class Solver {
             }
             newPopulation = elitism(newPopulation, 0.01);
             this.population = newPopulation;
-            double bestFitness = Double.NEGATIVE_INFINITY;
+            double bestFitness = Double.POSITIVE_INFINITY;
             for (Chromosome chromosome : this.population) {
                 chromosome.updateFitnessByWeightedSum();
-                if (chromosome.fitness > bestFitness) {
+                if (chromosome.fitness < bestFitness) {
                     bestFitness = chromosome.fitness;
                 }
             }

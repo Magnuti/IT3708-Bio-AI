@@ -6,7 +6,7 @@ import java.util.List;
 public class Chromosome {
 
     List<Depot> depots;
-    double fitness;
+    double fitness; // Less fitness is better, this is a minimization problem
 
     public Chromosome(List<Depot> depots) {
         this.depots = depots;
