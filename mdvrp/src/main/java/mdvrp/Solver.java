@@ -9,14 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.Collections;
 
 public class Solver {
-    int maxVehicesPerDepot;
-    int customerCount;
-    int depotCount;
+    int maxVehicesPerDepot; // TODO use this somewhere
+    int customerCount; // ? Needed?
+    int depotCount; // ? Needed?
     List<Depot> depots;
     List<Customer> customers;
     List<Chromosome> population = new ArrayList<>();
@@ -133,14 +135,11 @@ public class Solver {
         for (int i = 0; i < selection_size; i++) {
             // selection_size number of tournaments
             Chromosome[] tournamentSet = new Chromosome[tournamentSize];
-            Random rand = new Random();
             for (int j = 0; j < tournamentSize; j++) {
-                int index = rand.nextInt(population.size());
-                tournamentSet[j] = this.population.get(index);
+                tournamentSet[j] = Helper.getRandomElementFromList(this.population);
             }
 
-            double r = rand.nextDouble();
-            if (r < 0.8) { // TODO take as config parameter
+            if (ThreadLocalRandom.current().nextDouble() < 0.8) { // TODO take as config parameter
                 // Add most fit parent
                 // ? Should maybe sort here to enable k > 2, but it may affect performance
                 if (tournamentSet[0].fitness <= tournamentSet[1].fitness) {
@@ -150,14 +149,13 @@ public class Solver {
                 }
             } else {
                 // Add random parent
-                int index = rand.nextInt(tournamentSet.length);
-                winners[i] = tournamentSet[index];
+                winners[i] = Helper.getRandomElementFromList(tournamentSet);
             }
         }
         return winners;
     }
 
-    private void applyCrossoverOperations(List<Customer> customersToAdd, Depot depotToModify) {
+    private void crossoverInsertCustomers(List<Customer> customersToAdd, Depot depotToModify) {
         for (Customer customer : customersToAdd) {
             List<List<Double>> insertionCost = new ArrayList<>();
             List<List<Boolean>> maintainsFeasibility = new ArrayList<>();
@@ -178,13 +176,10 @@ public class Solver {
                 }
                 insertionCost.add(routeInsertionCost);
                 maintainsFeasibility.add(routeMaintainsFeasibility);
-                depotToModify.recalculateUsedRouteLengthAndCapacity(route); // TODO maybe cache this instead of
+                depotToModify.recalculateUsedRouteLengthAndCapacity(route); // ? maybe cache this instead
             }
 
-            Random rand = new Random();
-            double dieRoll = rand.nextDouble();
-            dieRoll = rand.nextDouble();
-            if (dieRoll < 1.0) { // TODO set this as a config parameter
+            if (ThreadLocalRandom.current().nextDouble() < 1.0) { // TODO set this as a config parameter
                 if (maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList()).contains(true)) {
                     // Insert at best feasible location
                     double bestInsertionCost = Double.POSITIVE_INFINITY;
@@ -202,7 +197,7 @@ public class Solver {
                         }
                     }
                     bestRoute.customers.add(bestInsertionIndex, customer);
-                    // depotToModify.recalculateUsedRouteLengthAndCapacity(bestRoute); // ?
+                    depotToModify.recalculateUsedRouteLengthAndCapacity(bestRoute); // ?
                 } else {
                     // Create new route
                     Route route = new Route();
@@ -213,8 +208,8 @@ public class Solver {
             } else {
                 // Insert at first entry in the list
                 // TODO
+                throw new Error();
             }
-
         }
     }
 
@@ -222,48 +217,50 @@ public class Solver {
         Chromosome offspring1 = new Chromosome(parent1);
         Chromosome offspring2 = new Chromosome(parent2);
 
-        Random rand = new Random();
-        double dieRoll = rand.nextDouble();
-        Chromosome[] offsprings = new Chromosome[2];
-        if (dieRoll < crossoverChance) {
-            int index = rand.nextInt(offspring1.depots.size());
-            Depot depot1 = offspring1.depots.get(index);
-            index = rand.nextInt(offspring2.depots.size());
-            Depot depot2 = offspring2.depots.get(index);
+        if (ThreadLocalRandom.current().nextDouble() < crossoverChance) {
+            Depot depot1 = Helper.getRandomElementFromList(offspring1.depots);
+            Depot depot2 = Helper.getRandomElementFromList(offspring2.depots);
 
-            index = rand.nextInt(depot1.routes.size());
-            Route route1 = depot1.routes.get(index);
-            index = rand.nextInt(depot2.routes.size());
-            Route route2 = depot2.routes.get(index);
+            // These needs to be copied because we don't want them to change
+            List<Customer> customers1 = new ArrayList<>(Helper.getRandomElementFromList(depot1.routes).customers);
+            List<Customer> customers2 = new ArrayList<>(Helper.getRandomElementFromList(depot2.routes).customers);
 
-            for (Customer customer : route1.customers) {
-                depot2.customers.remove(customer);
-                for (Route route : depot2.routes) {
-                    route.customers.remove(customer);
-                    // ? Maybe use some trick here to remove calculate the distance between j-1 and
-                    // ? j+1 for the removed customer j, instead of recalculating the entire route.
-                    depot2.recalculateUsedRouteLengthAndCapacity(route);
+            // Removes the customers from the chromosome
+            for (Customer customer : customers1) {
+                outer: for (Depot depot : offspring2.depots) {
+                    for (Route route : depot.routes) {
+                        if (route.customers.remove(customer)) {
+                            break outer;
+                        }
+                    }
                 }
             }
 
-            for (Customer customer : route2.customers) {
-                depot1.customers.remove(customer);
-                for (Route route : depot1.routes) {
-                    route.customers.remove(customer);
-                    depot1.recalculateUsedRouteLengthAndCapacity(route);
+            for (Customer customer : customers2) {
+                outer: for (Depot depot : offspring1.depots) {
+                    for (Route route : depot.routes) {
+                        if (route.customers.remove(customer)) {
+                            break outer;
+                        }
+                    }
                 }
             }
 
-            applyCrossoverOperations(route1.customers, depot2);
-            applyCrossoverOperations(route2.customers, depot1);
+            // TODO parallellize these
+            crossoverInsertCustomers(customers1, depot2);
+            crossoverInsertCustomers(customers2, depot1);
 
-            offsprings[0] = offspring1;
-            offsprings[1] = offspring2;
-        } else {
-            // Return the parents
-            offsprings[0] = parent1;
-            offsprings[1] = parent2;
+            for (Depot depot : offspring1.depots) {
+                depot.rebuildCustomerList();
+            }
+
+            for (Depot depot : offspring2.depots) {
+                depot.rebuildCustomerList();
+            }
+
         }
+        // If not crossover, we return a copy of the parents without modifications
+        Chromosome[] offsprings = { offspring1, offspring2 };
         return offsprings;
     }
 
@@ -309,7 +306,9 @@ public class Solver {
         Customer customer = Helper.getRandomElementFromList(depot.customers);
         // depot.customers.remove(customer); // ?
         for (Route route : depot.routes) {
-            route.customers.remove(customer);
+            if (route.customers.remove(customer)) {
+                break;
+            }
         }
 
         List<List<Double>> insertionCost = new ArrayList<>();
@@ -348,6 +347,7 @@ public class Solver {
             }
         }
         bestRoute.customers.add(bestInsertionIndex, customer);
+        depot.rebuildCustomerList();
     }
 
     void swapping(Depot depot) {
@@ -363,6 +363,7 @@ public class Solver {
         route2.customers.remove(customer2);
         route1.customers.add(customer2);
         route2.customers.add(customer1);
+        depot.rebuildCustomerList();
         depot.routeSchedulingFirstPart();
         depot.routeSchedulingSecondPart();
     }
@@ -376,15 +377,12 @@ public class Solver {
         // Remove customerToSwap from the depot which contains it
         // ? This allows for the same depot to add/remove, OK?
         for (Depot depot : chromosome.depots) {
-            boolean removed = depot.customers.remove(customerToSwap);
-            if (removed) {
+            if (depot.customers.remove(customerToSwap)) {
                 depot.routeSchedulingFirstPart();
                 depot.routeSchedulingSecondPart();
-                // depot.rebuildCustomerList(); // ?
                 break;
             }
         }
-        // toDepot.rebuildCustomerList(); // ?
 
         toDepot.customers.add(customerToSwap);
         toDepot.routeSchedulingFirstPart();
@@ -402,11 +400,12 @@ public class Solver {
         Random rand = new Random();
         double crossoverChance = 0.7; // TODO
         int APPRATE = 10; // TODO take as config parameter
-        System.out.println("Population size:" + this.population.size());
+        System.out.println("Population size: " + this.population.size());
         for (int generation = 0; generation < maxGeneration; generation++) {
             List<Chromosome> newPopulation = new ArrayList<>();
+            // TODO parallellize this, one thread for each i
             for (int i = 0; i < this.population.size() / 2; i++) {
-                Chromosome[] parents = tournamentSelection(2); // TODO make parent into array
+                Chromosome[] parents = tournamentSelection(2); // Note that these are not copies
                 Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
                 if (generation % APPRATE == 0) {
                     // Apply inter-depot mutation every 10th generation for example
@@ -419,7 +418,6 @@ public class Solver {
                     intraDepotMutation(offsprings[0].depots.get(depotIndex));
                     depotIndex = rand.nextInt(offsprings[1].depots.size());
                     intraDepotMutation(offsprings[1].depots.get(depotIndex));
-
                 }
                 newPopulation.add(offsprings[0]);
                 newPopulation.add(offsprings[1]);
@@ -433,6 +431,35 @@ public class Solver {
                     bestFitness = chromosome.fitness;
                 }
             }
+
+            // ! Test start
+            for (Chromosome chromosome : this.population) {
+                Set<Customer> customers = new HashSet<>();
+                Set<Customer> customersInRoutes = new HashSet<>();
+                for (Depot depot : chromosome.depots) {
+                    for (Route route : depot.routes) {
+                        for (Customer c : route.customers) {
+                            if (customersInRoutes.contains(c)) {
+                                System.err.println("Duplicate customer...");
+                            } else {
+                                customersInRoutes.add(c);
+                            }
+                        }
+                    }
+                    for (Customer customer : depot.customers) {
+                        if (customers.contains(customer)) {
+                            System.err.println("Duplicate customer...");
+                        } else {
+                            customers.add(customer);
+                        }
+                    }
+                }
+                if (customers.size() != this.customerCount || customersInRoutes.size() != this.customerCount) {
+                    System.err.println("Invalid customer count");
+                }
+            }
+            // ! Test end
+
             System.out.println("Best fitness: " + bestFitness);
         }
     }

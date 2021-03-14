@@ -54,7 +54,22 @@ for i, line in enumerate(lines):
         depots[index].x = int(line[1])
         depots[index].y = int(line[2])
 
-with open("test_solutions/p01.res", "r", encoding="utf-8") as f:
+plt.subplot(1, 2, 1)
+for depot in depots:
+    plt.plot(depot.x, depot.y, 'bo')
+
+for customer in customers:
+    plt.plot(customer.x, customer.y, 'r.')
+
+plt.subplot(1, 2, 2)
+for depot in depots:
+    plt.plot(depot.x, depot.y, 'bo')
+
+for customer in customers:
+    plt.plot(customer.x, customer.y, 'r.')
+
+# with open("test_solutions/p01.res", "r", encoding="utf-8") as f:
+with open("solutions/solution.res", "r", encoding="utf-8") as f:
     lines = f.read().splitlines()
 
 
@@ -62,16 +77,17 @@ def get_cmap(n, name='hsv'):
     # https://stackoverflow.com/questions/14720331/how-to-generate-random-colors-in-matplotlib
     '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct 
     RGB color; the keyword argument name must be a standard mpl colormap name.'''
-    return plt.cm.get_cmap(name, n)
+    return plt.cm.get_cmap(name, n + 1)
 
 
-cmap = get_cmap(len(lines[1:]))
-color_indexes = defaultdict(lambda: set([x for x in range(len(lines[1:]))]))
+cmap = get_cmap(max_vehicles_per_depot)
+color_indexes = defaultdict(lambda: set(
+    [x for x in range(max_vehicles_per_depot)]))
 
 for i, line in enumerate(lines[1:]):
     line = line.split()
     depot = next(filter(lambda x: x.id == int(line[0]), depots))
-    route = list(map(int, line[5:]))
+    route = list(map(int, line[6:-1]))
     route_customers = []
     for customer_id in route:
         route_customers.append(

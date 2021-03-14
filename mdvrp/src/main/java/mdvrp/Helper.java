@@ -18,6 +18,10 @@ public class Helper {
         return list.get(ThreadLocalRandom.current().nextInt(list.size()));
     }
 
+    static <T> T getRandomElementFromList(T[] array) {
+        return array[ThreadLocalRandom.current().nextInt(array.length)];
+    }
+
     static String getClassValuesAsString(Object o) {
         StringBuilder result = new StringBuilder();
         String newLine = System.getProperty("line.separator");
@@ -27,7 +31,7 @@ public class Helper {
         result.append(newLine);
 
         // determine fields declared in this class only (no fields of superclass)
-        Field[] fields = o.getClass().getDeclaredFields();
+        Field[] fields = o.getClass().getFields();
 
         // print field names paired with their values
         for (Field field : fields) {
