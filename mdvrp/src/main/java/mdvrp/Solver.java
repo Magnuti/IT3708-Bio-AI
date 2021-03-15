@@ -167,7 +167,7 @@ public class Solver {
                 route.customers.add(i, customer);
                 depotToModify.recalculateUsedRouteLengthAndCapacity(route);
                 routeInsertionCost.add(route.routeLength);
-                if (route.routeLength <= depotToModify.getMaxRouteDuration()
+                if (route.routeLength <= depotToModify.getMaxRouteDistance()
                         && route.usedCapacity <= depotToModify.getMaxVehicleLoad()) {
                     routeMaintainsFeasibility.add(true);
                 } else {

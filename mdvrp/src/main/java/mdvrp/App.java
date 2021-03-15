@@ -8,8 +8,8 @@ public class App {
         problemParser.parseFile(configParser.inputFile);
         Solver solver = new Solver(problemParser);
         solver.initDepotAssignment();
-        solver.initPopulation(10000);
-        solver.runGA(200);
+        solver.initPopulation(configParser.populationSize);
+        solver.runGA(configParser.maxGeneration);
         solver.saveBest();
     }
 }

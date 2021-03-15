@@ -1,7 +1,10 @@
-input_file: p04
+input_file: p01
 
 # Whether or not we should use the ./solutions or test_solutions directory
 test_solution: false
+
+population_size: 10000
+max_generation: 200
 
 crossover_chance: 0.7
 

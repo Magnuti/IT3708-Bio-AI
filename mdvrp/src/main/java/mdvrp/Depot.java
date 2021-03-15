@@ -5,7 +5,7 @@ import java.util.List;
 
 public class Depot {
     private int id;
-    private double maxRouteDuration;
+    private double maxRouteDistance;
     private int maxVehicleLoad;
     private int x;
     private int y;
@@ -14,19 +14,19 @@ public class Depot {
     List<Customer> swappableCustomers = new ArrayList<>();
     List<Route> routes = new ArrayList<>();
 
-    public Depot(int maxRouteDuration, int maxVehicleLoad) {
-        // Ignore maxRouteDuration for 0
-        if (maxRouteDuration == 0) {
-            this.maxRouteDuration = Double.POSITIVE_INFINITY;
+    public Depot(int maxRouteDistance, int maxVehicleLoad) {
+        // Ignore maxRouteDistance for 0
+        if (maxRouteDistance == 0) {
+            this.maxRouteDistance = Double.POSITIVE_INFINITY;
         } else {
-            this.maxRouteDuration = (double) maxRouteDuration;
+            this.maxRouteDistance = (double) maxRouteDistance;
         }
         this.maxVehicleLoad = maxVehicleLoad;
     }
 
     public Depot(Depot depotToCopy) {
         this.id = depotToCopy.id;
-        this.maxRouteDuration = depotToCopy.maxRouteDuration;
+        this.maxRouteDistance = depotToCopy.maxRouteDistance;
         this.maxVehicleLoad = depotToCopy.maxVehicleLoad;
         this.x = depotToCopy.x;
         this.y = depotToCopy.y;
@@ -56,7 +56,7 @@ public class Depot {
         for (Customer customer : this.customers) {
             double distance = Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
             if (this.getMaxVehicleLoad() >= usedCapacity + customer.getDemand()
-                    && this.getMaxRouteDuration() >= routeLength + distance
+                    && this.getMaxRouteDistance() >= routeLength + distance
                             + Helper.euclidianDistance(customer.getX(), customer.getY(), this.getX(), this.getY())) {
                 route.customers.add(customer);
                 usedCapacity += customer.getDemand();
@@ -80,7 +80,7 @@ public class Depot {
                 fromY = customer.getY();
 
                 // * Skip sanity check for performance gain
-                if (usedCapacity > this.getMaxVehicleLoad() || routeLength > this.getMaxRouteDuration()) {
+                if (usedCapacity > this.getMaxVehicleLoad() || routeLength > this.getMaxRouteDistance()) {
                     throw new Error("A customer is invalid for a depot!");
                 }
             }
@@ -135,8 +135,8 @@ public class Depot {
         return this.y;
     }
 
-    public double getMaxRouteDuration() {
-        return this.maxRouteDuration;
+    public double getMaxRouteDistance() {
+        return this.maxRouteDistance;
     }
 
     public int getMaxVehicleLoad() {
