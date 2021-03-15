@@ -83,9 +83,8 @@ public class Solver {
     }
 
     public void saveBest() {
-        // TODO save the best from this.population
         Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
-        List<Depot> depots = this.population.get(0).depots; // TODO
+        List<Depot> depots = this.population.get(0).depots;
 
         try {
             Path path = Paths.get("solutions");
@@ -115,14 +114,13 @@ public class Solver {
                     fr.write(
                             Integer.toString(route.customers.stream().map(x -> x.getDemand()).reduce(0, Integer::sum)));
                     fr.write("\t");
+                    // Prepend the depot ID for compatibility reasons
                     fr.write(Integer.toString(depot.getId()));
                     fr.write("\t");
-                    fr.write("0 "); // Prepend 0 for compatibality reasons
                     for (Customer c : route.customers) {
                         fr.write(Integer.toString(c.getId()));
                         fr.write(" ");
                     }
-                    fr.write("0"); // Append 0 for compatibality reasons
                     fr.write(System.lineSeparator());
                 }
             }

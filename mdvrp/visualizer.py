@@ -100,11 +100,7 @@ for i, line in enumerate(lines[1:]):
     line = line.split()
     depot = next(filter(lambda x: x.id == int(line[0]), depots))
 
-    # TODO
-    if test_solution:
-        route = list(map(int, line[5:]))  # Test solutions
-    else:
-        route = list(map(int, line[6:-1]))  # Our solution
+    route = list(map(int, line[5:]))
 
     route_customers = []
     for customer_id in route:
