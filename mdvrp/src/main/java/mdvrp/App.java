@@ -6,7 +6,7 @@ public class App {
         configParser.parseConfig();
         ProblemParser problemParser = new ProblemParser();
         problemParser.parseFile(configParser.inputFile);
-        Solver solver = new Solver(problemParser);
+        Solver solver = new Solver(problemParser, configParser.crossoverChance);
         solver.initDepotAssignment();
         solver.initPopulation(10000);
         solver.runGA(200);
