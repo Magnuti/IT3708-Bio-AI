@@ -58,6 +58,7 @@ public class Solver {
     }
 
     public void initPopulation(int populationSize) {
+        // ? try to combine this method with the one above
         if (populationSize % 2 == 1) {
             System.out.println(
                     "Warning: Please keep the population size as an even number. Why? Because two parents can reproduce easily, while three is more difficult.");
@@ -77,6 +78,8 @@ public class Solver {
             chromosome.routeSchedulingFirstPart();
             this.population.add(chromosome);
         }
+        this.customers = null;
+        this.depots = null;
     }
 
     public void saveBest() {
@@ -195,7 +198,7 @@ public class Solver {
             }
         }
         bestRoute.customers.add(bestInsertionIndex, customer);
-        depot.recalculateUsedRouteLengthAndCapacity(bestRoute); // ?
+        depot.recalculateUsedRouteLengthAndCapacity(bestRoute);
     }
 
     private void crossoverInsertCustomers(List<Customer> customersToAdd, Depot depotToModify) {
@@ -211,12 +214,14 @@ public class Solver {
                     // Create new route
                     Route route = new Route();
                     route.customers.add(customer);
+                    // TODO check that maxRoutes is not breached
                     depotToModify.routes.add(route);
                     depotToModify.recalculateUsedRouteLengthAndCapacity(route);
                 }
             } else {
                 // Insert at first entry in the list
-                // TODO
+                // TODO, call routeScheduler when we add to the first route
+                // TODO and check that no constraints are being breached
                 throw new Error();
             }
         }
@@ -290,19 +295,17 @@ public class Solver {
     }
 
     void reversalMutation(Depot depot) {
-        // depot.rebuildCustomerList();
         if (depot.customers.isEmpty()) {
             return;
         }
         int startIndex = ThreadLocalRandom.current().nextInt(depot.customers.size());
         int endIndex = startIndex + 1 + ThreadLocalRandom.current().nextInt(depot.customers.size() - startIndex);
-        Collections.reverse(customers.subList(startIndex, endIndex));
+        Collections.reverse(depot.customers.subList(startIndex, endIndex));
         depot.routeSchedulingFirstPart();
         depot.routeSchedulingSecondPart();
     }
 
     void singleCustomerReRouting(Depot depot) {
-        // depot.rebuildCustomerList(); // ?
         if (depot.customers.isEmpty()) {
             return;
         }
@@ -383,7 +386,7 @@ public class Solver {
 
     }
 
-    List<Chromosome> elitism(List<Chromosome> newPopulation, double ratio) {
+    void elitism(List<Chromosome> newPopulation, double ratio) {
         // Randomly replace some % of the population with the best some % from
         // the parent population
         Collections.shuffle(newPopulation);
@@ -395,7 +398,7 @@ public class Solver {
         for (int i = 0; i < toSwap; i++) {
             newPopulation.set(i, this.population.get(i));
         }
-        return newPopulation;
+        this.population = newPopulation;
     }
 
     public void runGA(int maxGeneration) {
