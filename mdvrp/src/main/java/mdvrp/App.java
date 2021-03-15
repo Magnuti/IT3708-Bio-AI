@@ -6,10 +6,10 @@ public class App {
         configParser.parseConfig();
         ProblemParser problemParser = new ProblemParser();
         problemParser.parseFile(configParser.inputFile);
-        Solver solver = new Solver(problemParser);
+        Solver solver = new Solver(configParser, problemParser);
         solver.initDepotAssignment();
-        solver.initPopulation(configParser.populationSize);
-        solver.runGA(configParser.maxGeneration);
+        solver.initPopulation();
+        solver.runGA();
         solver.saveBest();
     }
 }

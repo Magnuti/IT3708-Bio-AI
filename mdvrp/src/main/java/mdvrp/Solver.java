@@ -8,30 +8,45 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.Collections;
 
 public class Solver {
+    // From ConfigParser
+    int populationSize;
+    int maxGeneration;
+    double eliteRatio;
+    double crossoverChance;
+    double bound;
+    double tournamentSelectionNumber;
+    double crossoverInsertionNumber;
+    int apprate;
+
+    // From ProblemParser
     int maxVehicesPerDepot; // TODO use this somewhere
-    int customerCount; // ? Needed?
-    int depotCount; // ? Needed?
     List<Depot> depots;
     List<Customer> customers;
     List<Chromosome> population = new ArrayList<>();
 
-    public Solver(ProblemParser problemParser) {
+    public Solver(ConfigParser configParser, ProblemParser problemParser) {
+        this.populationSize = configParser.populationSize;
+        this.maxGeneration = configParser.maxGeneration;
+        this.eliteRatio = configParser.eliteRatio;
+        this.crossoverChance = configParser.crossoverChance;
+        this.bound = configParser.bound;
+        this.tournamentSelectionNumber = configParser.tournamentSelectionNumber;
+        this.crossoverInsertionNumber = configParser.crossoverInsertionNumber;
+        this.apprate = configParser.apprate;
+
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
-        this.customerCount = problemParser.customerCount;
-        this.depotCount = problemParser.depotCount;
         this.depots = problemParser.depots;
         this.customers = problemParser.customers;
     }
 
     public void initDepotAssignment() {
-        // TODO parallellize this
+        // ? parallellize this
         for (Customer customer : this.customers) {
             double lowestDistance = Double.POSITIVE_INFINITY;
             Depot bestDepot = null;
@@ -45,7 +60,7 @@ public class Solver {
             }
             bestDepot.customers.add(customer);
 
-            double bound = 2.0; // TODO take as config param
+            double bound = this.bound;
             for (Depot depot : this.depots) {
                 double min = Helper.euclidianDistance(customer.getX(), customer.getY(), bestDepot.getX(),
                         bestDepot.getY());
@@ -57,15 +72,15 @@ public class Solver {
         }
     }
 
-    public void initPopulation(int populationSize) {
+    public void initPopulation() {
         // ? try to combine this method with the one above
-        if (populationSize % 2 == 1) {
+        if (this.populationSize % 2 == 1) {
             System.out.println(
                     "Warning: Please keep the population size as an even number. Why? Because two parents can reproduce easily, while three is more difficult.");
-            populationSize = populationSize - 1;
-            System.out.println("Using a population size of: " + populationSize);
+            this.populationSize--;
+            System.out.println("Using a population size of: " + this.populationSize);
         }
-        for (int i = 0; i < populationSize; i++) {
+        for (int i = 0; i < this.populationSize; i++) {
             // We need to clone depots to the different chromosomes
             List<Depot> depots = new ArrayList<>();
             for (Depot depot : this.depots) {
@@ -140,7 +155,7 @@ public class Solver {
                 tournamentSet[j] = Helper.getRandomElementFromList(this.population);
             }
 
-            if (ThreadLocalRandom.current().nextDouble() < 0.8) { // TODO take as config parameter
+            if (ThreadLocalRandom.current().nextDouble() < tournamentSelectionNumber) {
                 // Add most fit parent
                 // ? Should maybe sort here to enable k > 2, but it may affect performance
                 if (tournamentSet[0].fitness <= tournamentSet[1].fitness) {
@@ -203,7 +218,7 @@ public class Solver {
         for (Customer customer : customersToAdd) {
             InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer, depotToModify);
 
-            if (ThreadLocalRandom.current().nextDouble() < 1.0) { // TODO set this as a config parameter
+            if (ThreadLocalRandom.current().nextDouble() < this.crossoverInsertionNumber) {
                 if (icaf.maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList())
                         .contains(true)) {
                     // Insert at best feasible location
@@ -225,11 +240,11 @@ public class Solver {
         }
     }
 
-    Chromosome[] crossover(Chromosome parent1, Chromosome parent2, double crossoverChance) {
+    Chromosome[] crossover(Chromosome parent1, Chromosome parent2) {
         Chromosome offspring1 = new Chromosome(parent1);
         Chromosome offspring2 = new Chromosome(parent2);
 
-        if (ThreadLocalRandom.current().nextDouble() < crossoverChance) {
+        if (ThreadLocalRandom.current().nextDouble() < this.crossoverChance) {
             Depot depot1 = Helper.getRandomElementFromList(offspring1.depots);
             Depot depot2 = Helper.getRandomElementFromList(offspring2.depots);
 
@@ -384,12 +399,12 @@ public class Solver {
 
     }
 
-    void elitism(List<Chromosome> newPopulation, double ratio) {
+    void elitism(List<Chromosome> newPopulation) {
         // Randomly replace some % of the population with the best some % from
         // the parent population
         Collections.shuffle(newPopulation);
         Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
-        int toSwap = (int) Math.round((double) this.population.size() * ratio);
+        int toSwap = (int) Math.round((double) this.population.size() * this.eliteRatio);
         if (toSwap == 0) {
             System.out.println("Warning: elitism is not applied.");
         }
@@ -399,17 +414,15 @@ public class Solver {
         this.population = newPopulation;
     }
 
-    public void runGA(int maxGeneration) {
-        double crossoverChance = 0.7; // TODO
-        int APPRATE = 10; // TODO take as config parameter
+    public void runGA() {
         System.out.println("Population size: " + this.population.size());
-        for (int generation = 0; generation < maxGeneration; generation++) {
+        for (int generation = 0; generation < this.maxGeneration; generation++) {
             List<Chromosome> newPopulation = new ArrayList<>();
             // TODO parallellize this, one thread for each i
             for (int i = 0; i < this.population.size() / 2; i++) {
                 Chromosome[] parents = tournamentSelection(2); // Note that these are not copies
-                Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
-                if (generation % APPRATE == 0) {
+                Chromosome[] offsprings = crossover(parents[0], parents[1]);
+                if (generation % this.apprate == 0) {
                     // Apply inter-depot mutation every 10th generation for example
                     // TODO parallellize
                     interDepotMutation(offsprings[0]);
@@ -428,7 +441,7 @@ public class Solver {
                 chromosome.updateFitnessByTotalDistance();
             }
 
-            elitism(newPopulation, 0.01);
+            elitism(newPopulation);
 
             double bestFitness = Double.POSITIVE_INFINITY;
             for (Chromosome chromosome : this.population) {
@@ -437,36 +450,6 @@ public class Solver {
                     bestFitness = chromosome.fitness;
                 }
             }
-
-            // ! Test start
-            for (Chromosome chromosome : this.population) {
-                Set<Customer> customers = new HashSet<>();
-                Set<Customer> customersInRoutes = new HashSet<>();
-                for (Depot depot : chromosome.depots) {
-                    for (Route route : depot.routes) {
-                        for (Customer c : route.customers) {
-                            if (customersInRoutes.contains(c)) {
-                                // System.err.println("Duplicate customer in route...");
-                                throw new Error("Duplicate customer in route...");
-                            } else {
-                                customersInRoutes.add(c);
-                            }
-                        }
-                    }
-                    for (Customer customer : depot.customers) {
-                        if (customers.contains(customer)) {
-                            // System.err.println("Duplicate customer...");
-                            throw new Error("Duplicate customer...");
-                        } else {
-                            customers.add(customer);
-                        }
-                    }
-                }
-                if (customers.size() != this.customerCount || customersInRoutes.size() != this.customerCount) {
-                    System.err.println("Invalid customer count");
-                }
-            }
-            // ! Test end
 
             System.out.println("Best fitness: " + bestFitness);
         }
