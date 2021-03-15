@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import random
 from collections import defaultdict
 import yaml
+from os import path
 
 
 @dataclass
@@ -40,7 +41,6 @@ with open("config.yaml", "r", encoding="utf-8") as f:
     config_data = yaml.safe_load(f)
 
 input_file = config_data["input_file"]
-test_solution = config_data["test_solution"]
 
 
 with open("test_data/" + input_file,  "r", encoding="utf-8") as f:
@@ -61,29 +61,6 @@ for i, line in enumerate(lines):
         depots[index].x = int(line[1])
         depots[index].y = int(line[2])
 
-plt.suptitle("Problem file: " + input_file)
-plt.subplot(1, 2, 1)
-for depot in depots:
-    plt.plot(depot.x, depot.y, 'bo')
-
-for customer in customers:
-    plt.plot(customer.x, customer.y, 'r.')
-
-plt.subplot(1, 2, 2)
-for depot in depots:
-    plt.plot(depot.x, depot.y, 'bo')
-
-for customer in customers:
-    plt.plot(customer.x, customer.y, 'r.')
-
-if test_solution:
-    output_file = "test_solutions/{}.res".format(input_file)
-else:
-    output_file = "solutions/solution.res"
-
-with open(output_file, "r", encoding="utf-8") as f:
-    lines = f.read().splitlines()
-
 
 def get_cmap(n, name='hsv'):
     # https://stackoverflow.com/questions/14720331/how-to-generate-random-colors-in-matplotlib
@@ -92,31 +69,64 @@ def get_cmap(n, name='hsv'):
     return plt.cm.get_cmap(name, n + 1)
 
 
-cmap = get_cmap(max_vehicles_per_depot)
-color_indexes = defaultdict(lambda: set(
-    [x for x in range(max_vehicles_per_depot)]))
+def plot_solution(solution_file, title):
+    with open(solution_file, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
 
-for i, line in enumerate(lines[1:]):
-    line = line.split()
-    depot = next(filter(lambda x: x.id == int(line[0]), depots))
+    plt.title(title + " - total distance: " + lines[0])
 
-    route = list(map(int, line[5:]))
+    cmap = get_cmap(max_vehicles_per_depot)
+    color_indexes = defaultdict(lambda: set(
+        [x for x in range(max_vehicles_per_depot)]))
 
-    route_customers = []
-    for customer_id in route:
-        route_customers.append(
-            next(filter(lambda x: x.id == customer_id, customers)))
+    for i, line in enumerate(lines[1:]):
+        line = line.split()
+        depot = next(filter(lambda x: x.id == int(line[0]), depots))
 
-    color_index = random.choice(tuple(color_indexes[depot.id]))
-    color_indexes[depot.id].remove(color_index)
+        route = list(map(int, line[5:]))
 
-    from_x = depot.x
-    from_y = depot.y
-    for customer in route_customers:
-        plt.plot([from_x, customer.x], [
-                 from_y, customer.y], c=cmap(color_index))
-        from_x = customer.x
-        from_y = customer.y
-    plt.plot([from_x, depot.x], [from_y, depot.y], c=cmap(color_index))
+        route_customers = []
+        for customer_id in route:
+            route_customers.append(
+                next(filter(lambda x: x.id == customer_id, customers)))
+
+        color_index = random.choice(tuple(color_indexes[depot.id]))
+        color_indexes[depot.id].remove(color_index)
+
+        from_x = depot.x
+        from_y = depot.y
+        for customer in route_customers:
+            plt.plot([from_x, customer.x], [
+                from_y, customer.y], c=cmap(color_index))
+            from_x = customer.x
+            from_y = customer.y
+        plt.plot([from_x, depot.x], [from_y, depot.y], c=cmap(color_index))
+
+
+def plot_depots_and_customer():
+    for depot in depots:
+        plt.plot(depot.x, depot.y, 'bo')
+
+    for customer in customers:
+        plt.plot(customer.x, customer.y, 'r.')
+
+
+if path.exists("test_solutions/{}.res".format(input_file)):
+    plt.figure(figsize=(16, 8))
+
+    plt.subplot(1, 2, 1)
+    plot_depots_and_customer()
+    plot_solution("solutions/solution.res", "Solution")
+
+    plt.subplot(1, 2, 2)
+    plot_depots_and_customer()
+    plot_solution("test_solutions/{}.res".format(input_file),
+                  "Test solution")
+else:
+    plt.figure(figsize=(8, 8))
+    plot_depots_and_customer()
+    plot_solution("solutions/solution.res", "Solution")
+
+plt.suptitle("Problem file: " + input_file)
 
 plt.show()
