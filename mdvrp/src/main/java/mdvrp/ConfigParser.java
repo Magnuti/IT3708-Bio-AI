@@ -11,6 +11,7 @@ import org.yaml.snakeyaml.Yaml;
 public class ConfigParser {
 
     String inputFile;
+    double crossoverChance;
     double bound;
     double tournamentSelectionNumber;
     double crossoverInsertionNumber;
@@ -23,6 +24,7 @@ public class ConfigParser {
             InputStream inputStream = new FileInputStream(new File("config.yaml"));
             Map<String, Object> obj = yaml.load(inputStream);
             this.inputFile = obj.get("input_file").toString();
+            this.crossoverChance = (double) obj.get("crossover_chance");
             this.bound = (double) obj.get("bound");
             this.tournamentSelectionNumber = (double) obj.get("tournament_selection_number");
             this.crossoverInsertionNumber = (double) obj.get("crossover_insertion_number");

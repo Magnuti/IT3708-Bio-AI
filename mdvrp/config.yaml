@@ -3,6 +3,8 @@ input_file: p04
 # Whether or not we should use the ./solutions or test_solutions directory
 test_solution: false
 
+crossover_chance: 0.7
+
 bound: 2.0
 
 # Typically between 0.6 and 1.0. Represents the probability that we select the best
