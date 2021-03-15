@@ -1,0 +1,16 @@
+input_file: p04
+
+# Whether or not we should use the ./solutions or test_solutions directory
+test_solution: false
+
+bound: 2.0
+
+# Typically between 0.6 and 1.0. Represents the probability that we select the best
+# individual and not a random one.
+tournament_selection_number: 0.8
+
+# The probability that we choose the best feasible location over the first location
+crossover_insertion_number: 0.8
+
+# Do inter-depot mutation (instead of intra-depot) every APPRATE generation
+APPRATE: 10

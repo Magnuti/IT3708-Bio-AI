@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from dataclasses import dataclass
 import random
 from collections import defaultdict
+import yaml
 
 
 @dataclass
@@ -35,8 +36,14 @@ class Customer:
 depots = []
 customers = []
 
+with open("config.yaml", "r", encoding="utf-8") as f:
+    config_data = yaml.safe_load(f)
 
-with open("test_data/p01",  "r", encoding="utf-8") as f:
+input_file = config_data["input_file"]
+test_solution = config_data["test_solution"]
+
+
+with open("test_data/" + input_file,  "r", encoding="utf-8") as f:
     lines = f.read().splitlines()
 
 for i, line in enumerate(lines):
@@ -54,6 +61,7 @@ for i, line in enumerate(lines):
         depots[index].x = int(line[1])
         depots[index].y = int(line[2])
 
+plt.suptitle("Problem file: " + input_file)
 plt.subplot(1, 2, 1)
 for depot in depots:
     plt.plot(depot.x, depot.y, 'bo')
@@ -68,8 +76,12 @@ for depot in depots:
 for customer in customers:
     plt.plot(customer.x, customer.y, 'r.')
 
-# with open("test_solutions/p01.res", "r", encoding="utf-8") as f:
-with open("solutions/solution.res", "r", encoding="utf-8") as f:
+if test_solution:
+    output_file = "test_solutions/{}.res".format(input_file)
+else:
+    output_file = "solutions/solution.res"
+
+with open(output_file, "r", encoding="utf-8") as f:
     lines = f.read().splitlines()
 
 
@@ -87,7 +99,13 @@ color_indexes = defaultdict(lambda: set(
 for i, line in enumerate(lines[1:]):
     line = line.split()
     depot = next(filter(lambda x: x.id == int(line[0]), depots))
-    route = list(map(int, line[6:-1]))
+
+    # TODO
+    if test_solution:
+        route = list(map(int, line[5:]))  # Test solutions
+    else:
+        route = list(map(int, line[6:-1]))  # Our solution
+
     route_customers = []
     for customer_id in route:
         route_customers.append(
