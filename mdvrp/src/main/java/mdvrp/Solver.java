@@ -8,7 +8,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
@@ -82,6 +81,7 @@ public class Solver {
 
     public void saveBest() {
         // TODO save the best from this.population
+        Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
         List<Depot> depots = this.population.get(0).depots; // TODO
 
         try {
@@ -155,49 +155,58 @@ public class Solver {
         return winners;
     }
 
+    private InsertionCostAndFeasibility getInsertionCostAndFeasibility(Customer customer, Depot depotToModify) {
+        InsertionCostAndFeasibility icaf = new InsertionCostAndFeasibility();
+        for (Route route : depotToModify.routes) {
+            List<Double> routeInsertionCost = new ArrayList<>();
+            List<Boolean> routeMaintainsFeasibility = new ArrayList<>();
+            for (int i = 0; i < route.customers.size() + 1; i++) {
+                route.customers.add(i, customer);
+                depotToModify.recalculateUsedRouteLengthAndCapacity(route);
+                routeInsertionCost.add(route.routeLength);
+                if (route.routeLength <= depotToModify.getMaxRouteDuration()
+                        && route.usedCapacity <= depotToModify.getMaxVehicleLoad()) {
+                    routeMaintainsFeasibility.add(true);
+                } else {
+                    routeMaintainsFeasibility.add(false);
+                }
+                route.customers.remove(customer);
+            }
+            icaf.insertionCost.add(routeInsertionCost);
+            icaf.maintainsFeasibility.add(routeMaintainsFeasibility);
+            depotToModify.recalculateUsedRouteLengthAndCapacity(route); // ? maybe cache this instead
+        }
+        return icaf;
+    }
+
+    private void insertCustomerAtBestLocation(InsertionCostAndFeasibility icaf, Depot depot, Customer customer) {
+        double bestInsertionCost = Double.POSITIVE_INFINITY;
+        Route bestRoute = null;
+        int bestInsertionIndex = 0;
+        for (int i = 0; i < icaf.insertionCost.size(); i++) {
+            for (int k = 0; k < icaf.insertionCost.get(i).size(); k++) {
+                if (icaf.maintainsFeasibility.get(i).get(k)) {
+                    if (icaf.insertionCost.get(i).get(k) < bestInsertionCost) {
+                        bestInsertionCost = icaf.insertionCost.get(i).get(k);
+                        bestRoute = depot.routes.get(i);
+                        bestInsertionIndex = k;
+                    }
+                }
+            }
+        }
+        bestRoute.customers.add(bestInsertionIndex, customer);
+        depot.recalculateUsedRouteLengthAndCapacity(bestRoute); // ?
+    }
+
     private void crossoverInsertCustomers(List<Customer> customersToAdd, Depot depotToModify) {
         for (Customer customer : customersToAdd) {
-            List<List<Double>> insertionCost = new ArrayList<>();
-            List<List<Boolean>> maintainsFeasibility = new ArrayList<>();
-            for (Route route : depotToModify.routes) {
-                List<Double> routeInsertionCost = new ArrayList<>();
-                List<Boolean> routeMaintainsFeasibility = new ArrayList<>();
-                for (int i = 0; i < route.customers.size() + 1; i++) {
-                    route.customers.add(i, customer);
-                    depotToModify.recalculateUsedRouteLengthAndCapacity(route);
-                    routeInsertionCost.add(route.routeLength);
-                    if (route.routeLength <= depotToModify.getMaxRouteDuration()
-                            && route.usedCapacity <= depotToModify.getMaxVehicleLoad()) {
-                        routeMaintainsFeasibility.add(true);
-                    } else {
-                        routeMaintainsFeasibility.add(false);
-                    }
-                    route.customers.remove(customer);
-                }
-                insertionCost.add(routeInsertionCost);
-                maintainsFeasibility.add(routeMaintainsFeasibility);
-                depotToModify.recalculateUsedRouteLengthAndCapacity(route); // ? maybe cache this instead
-            }
+            InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer, depotToModify);
 
             if (ThreadLocalRandom.current().nextDouble() < 1.0) { // TODO set this as a config parameter
-                if (maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList()).contains(true)) {
+                if (icaf.maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList())
+                        .contains(true)) {
                     // Insert at best feasible location
-                    double bestInsertionCost = Double.POSITIVE_INFINITY;
-                    Route bestRoute = null;
-                    int bestInsertionIndex = 0;
-                    for (int i = 0; i < insertionCost.size(); i++) {
-                        for (int k = 0; k < insertionCost.get(i).size(); k++) {
-                            if (maintainsFeasibility.get(i).get(k)) {
-                                if (insertionCost.get(i).get(k) < bestInsertionCost) {
-                                    bestInsertionCost = insertionCost.get(i).get(k);
-                                    bestRoute = depotToModify.routes.get(i);
-                                    bestInsertionIndex = k;
-                                }
-                            }
-                        }
-                    }
-                    bestRoute.customers.add(bestInsertionIndex, customer);
-                    depotToModify.recalculateUsedRouteLengthAndCapacity(bestRoute); // ?
+                    insertCustomerAtBestLocation(icaf, depotToModify, customer);
                 } else {
                     // Create new route
                     Route route = new Route();
@@ -281,18 +290,13 @@ public class Solver {
     }
 
     void reversalMutation(Depot depot) {
-        depot.rebuildCustomerList();
+        // depot.rebuildCustomerList();
         if (depot.customers.isEmpty()) {
             return;
         }
         int startIndex = ThreadLocalRandom.current().nextInt(depot.customers.size());
         int endIndex = startIndex + 1 + ThreadLocalRandom.current().nextInt(depot.customers.size() - startIndex);
-        List<Customer> toReverse = depot.customers.subList(startIndex, endIndex);
-        int reverseIndex = toReverse.size() - 1;
-        for (int i = startIndex; i < endIndex; i++) {
-            depot.customers.set(i, toReverse.get(reverseIndex));
-            reverseIndex--;
-        }
+        Collections.reverse(customers.subList(startIndex, endIndex));
         depot.routeSchedulingFirstPart();
         depot.routeSchedulingSecondPart();
     }
@@ -304,61 +308,35 @@ public class Solver {
         }
 
         Customer customer = Helper.getRandomElementFromList(depot.customers);
-        // depot.customers.remove(customer); // ?
         for (Route route : depot.routes) {
             if (route.customers.remove(customer)) {
                 break;
             }
         }
 
-        List<List<Double>> insertionCost = new ArrayList<>();
-        List<List<Boolean>> maintainsFeasibility = new ArrayList<>();
-        for (Route route : depot.routes) {
-            List<Double> routeInsertionCost = new ArrayList<>();
-            List<Boolean> routeMaintainsFeasibility = new ArrayList<>();
-            for (int i = 0; i < route.customers.size() + 1; i++) {
-                route.customers.add(i, customer);
-                depot.recalculateUsedRouteLengthAndCapacity(route);
-                routeInsertionCost.add(route.routeLength);
-                if (route.routeLength <= depot.getMaxRouteDuration()
-                        && route.usedCapacity <= depot.getMaxVehicleLoad()) {
-                    routeMaintainsFeasibility.add(true);
-                } else {
-                    routeMaintainsFeasibility.add(false);
-                }
-                route.customers.remove(customer);
-            }
-            insertionCost.add(routeInsertionCost);
-            maintainsFeasibility.add(routeMaintainsFeasibility);
-            depot.recalculateUsedRouteLengthAndCapacity(route); // TODO maybe cache this instead of
-        }
-        double bestInsertionCost = Double.POSITIVE_INFINITY;
-        Route bestRoute = null;
-        int bestInsertionIndex = 0;
-        for (int i = 0; i < insertionCost.size(); i++) {
-            for (int k = 0; k < insertionCost.get(i).size(); k++) {
-                if (maintainsFeasibility.get(i).get(k)) {
-                    if (insertionCost.get(i).get(k) < bestInsertionCost) {
-                        bestInsertionCost = insertionCost.get(i).get(k);
-                        bestRoute = depot.routes.get(i);
-                        bestInsertionIndex = k;
-                    }
-                }
-            }
-        }
-        bestRoute.customers.add(bestInsertionIndex, customer);
+        InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer, depot);
+
+        // No need to check if there are feasible locations here because it must be at
+        // least one, since the removed location was feasible.
+        insertCustomerAtBestLocation(icaf, depot, customer);
+
         depot.rebuildCustomerList();
     }
 
     void swapping(Depot depot) {
-        // ? This allows route1.equal(route2), is it OK?
-        Route route1 = Helper.getRandomElementFromList(depot.routes);
-        Route route2 = Helper.getRandomElementFromList(depot.routes);
+        if (depot.routes.size() < 2) {
+            return;
+        }
+        List<Route> routes = Helper.getNRandomElementsFromList(depot.routes, 2);
+        Route route1 = routes.get(0);
+        Route route2 = routes.get(1);
+
         if (route1.customers.isEmpty() || route2.customers.isEmpty()) {
             return;
         }
         Customer customer1 = Helper.getRandomElementFromList(route1.customers);
         Customer customer2 = Helper.getRandomElementFromList(route2.customers);
+
         route1.customers.remove(customer1);
         route2.customers.remove(customer2);
         route1.customers.add(customer2);
@@ -371,19 +349,34 @@ public class Solver {
     void interDepotMutation(Chromosome chromosome) {
         List<Depot> depotsWithSwappableCustomers = chromosome.depots.stream()
                 .filter(x -> x.swappableCustomers.size() > 0).collect(Collectors.toList());
+        List<Depot> toRemove = new ArrayList<>();
+        for (Depot depot : depotsWithSwappableCustomers) {
+            // Already full depot
+            if (new HashSet<>(depot.customers).containsAll(new HashSet<>(depot.swappableCustomers))) {
+                toRemove.add(depot);
+            }
+        }
+        depotsWithSwappableCustomers.removeAll(toRemove);
+        if (depotsWithSwappableCustomers.isEmpty()) {
+            return;
+        }
+
         Depot toDepot = Helper.getRandomElementFromList(depotsWithSwappableCustomers);
-        Customer customerToSwap = Helper.getRandomElementFromList(toDepot.swappableCustomers);
+        HashSet<Customer> possibleCustomersToGet = new HashSet<>(toDepot.swappableCustomers);
+        possibleCustomersToGet.removeAll(toDepot.customers);
+        Customer customerToSwap = Helper.getRandomElementFromList(new ArrayList<>(possibleCustomersToGet));
 
         // Remove customerToSwap from the depot which contains it
-        // ? This allows for the same depot to add/remove, OK?
         for (Depot depot : chromosome.depots) {
             if (depot.customers.remove(customerToSwap)) {
                 depot.routeSchedulingFirstPart();
                 depot.routeSchedulingSecondPart();
-                break;
             }
         }
 
+        // TODO check if not this.maxDexVehiclesPerDepot is not breached
+
+        // TODO Maybe we should insert at the best feasible location here instead
         toDepot.customers.add(customerToSwap);
         toDepot.routeSchedulingFirstPart();
         toDepot.routeSchedulingSecondPart();
@@ -391,13 +384,21 @@ public class Solver {
     }
 
     List<Chromosome> elitism(List<Chromosome> newPopulation, double ratio) {
-        // TODO replace some of the chromosones in offsprings with some of the fittest
-        // from this.population
+        // Randomly replace some % of the population with the best some % from
+        // the parent population
+        Collections.shuffle(newPopulation);
+        Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
+        int toSwap = (int) Math.round((double) this.population.size() * ratio);
+        if (toSwap == 0) {
+            System.out.println("Warning: elitism is not applied.");
+        }
+        for (int i = 0; i < toSwap; i++) {
+            newPopulation.set(i, this.population.get(i));
+        }
         return newPopulation;
     }
 
     public void runGA(int maxGeneration) {
-        Random rand = new Random();
         double crossoverChance = 0.7; // TODO
         int APPRATE = 10; // TODO take as config parameter
         System.out.println("Population size: " + this.population.size());
@@ -409,24 +410,28 @@ public class Solver {
                 Chromosome[] offsprings = crossover(parents[0], parents[1], crossoverChance);
                 if (generation % APPRATE == 0) {
                     // Apply inter-depot mutation every 10th generation for example
+                    // TODO parallellize
                     interDepotMutation(offsprings[0]);
                     interDepotMutation(offsprings[1]);
                 } else {
                     // Intra-depot mutation
                     // Selects a random depot to perform mutation on
-                    int depotIndex = rand.nextInt(offsprings[0].depots.size());
-                    intraDepotMutation(offsprings[0].depots.get(depotIndex));
-                    depotIndex = rand.nextInt(offsprings[1].depots.size());
-                    intraDepotMutation(offsprings[1].depots.get(depotIndex));
+                    intraDepotMutation(Helper.getRandomElementFromList(offsprings[0].depots));
+                    intraDepotMutation(Helper.getRandomElementFromList(offsprings[1].depots));
                 }
                 newPopulation.add(offsprings[0]);
                 newPopulation.add(offsprings[1]);
             }
-            newPopulation = elitism(newPopulation, 0.01);
-            this.population = newPopulation;
+
+            for (Chromosome chromosome : newPopulation) {
+                chromosome.updateFitnessByTotalDistance();
+            }
+
+            elitism(newPopulation, 0.01);
+
             double bestFitness = Double.POSITIVE_INFINITY;
             for (Chromosome chromosome : this.population) {
-                chromosome.updateFitnessByWeightedSum();
+                chromosome.updateFitnessByTotalDistance();
                 if (chromosome.fitness < bestFitness) {
                     bestFitness = chromosome.fitness;
                 }
@@ -440,7 +445,8 @@ public class Solver {
                     for (Route route : depot.routes) {
                         for (Customer c : route.customers) {
                             if (customersInRoutes.contains(c)) {
-                                System.err.println("Duplicate customer...");
+                                // System.err.println("Duplicate customer in route...");
+                                throw new Error("Duplicate customer in route...");
                             } else {
                                 customersInRoutes.add(c);
                             }
@@ -448,7 +454,8 @@ public class Solver {
                     }
                     for (Customer customer : depot.customers) {
                         if (customers.contains(customer)) {
-                            System.err.println("Duplicate customer...");
+                            // System.err.println("Duplicate customer...");
+                            throw new Error("Duplicate customer...");
                         } else {
                             customers.add(customer);
                         }

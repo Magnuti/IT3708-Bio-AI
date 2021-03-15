@@ -32,6 +32,14 @@ public class Chromosome {
         return;
     }
 
+    public void updateFitnessByTotalDistance() {
+        double fitness = 0.0;
+        for (Depot depot : this.depots) {
+            fitness += depot.routes.stream().map(x -> x.routeLength).reduce(0.0, Double::sum);
+        }
+        this.fitness = fitness;
+    }
+
     public void updateFitnessByWeightedSum(double alpha, double beta) {
         double fitness = 0.0;
         for (Depot depot : this.depots) {
@@ -42,12 +50,13 @@ public class Chromosome {
     }
 
     public void updateFitnessByWeightedSum() {
+        throw new Error("updateFitnessByWeightedSum() is not used.");
         // The default values care very much about vehicle count and very little about
         // total distance.
         // TODO experiment with different values here, our goal is to minimize the
         // distance.
         // updateFitnessByWeightedSum(100, 0.001); // Default values in the PDF
-        updateFitnessByWeightedSum(0, 1);
+        // updateFitnessByWeightedSum(0, 1);
     }
 
 }

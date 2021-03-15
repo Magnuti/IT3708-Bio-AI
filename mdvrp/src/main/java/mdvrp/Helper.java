@@ -1,6 +1,8 @@
 package mdvrp;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -20,6 +22,12 @@ public class Helper {
 
     static <T> T getRandomElementFromList(T[] array) {
         return array[ThreadLocalRandom.current().nextInt(array.length)];
+    }
+
+    static <T> List<T> getNRandomElementsFromList(List<T> list, int n) {
+        List<T> listCopy = new ArrayList<>(list);
+        Collections.shuffle(listCopy);
+        return listCopy.subList(0, n);
     }
 
     static String getClassValuesAsString(Object o) {
