@@ -13,7 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.Collections;
 
-public class Solver {
+public class Solver extends Thread {
     // From ConfigParser
     int populationSize;
     int maxGeneration;
@@ -28,7 +28,9 @@ public class Solver {
     int maxVehicesPerDepot; // TODO use this somewhere
     List<Depot> depots;
     List<Customer> customers;
-    List<Chromosome> population = new ArrayList<>();
+
+    private List<Chromosome> population = new ArrayList<>();
+    private AtomicCounter customersLeft;
 
     public Solver(ConfigParser configParser, ProblemParser problemParser) {
         this.populationSize = configParser.populationSize;
@@ -91,6 +93,8 @@ public class Solver {
             }
             Chromosome chromosome = new Chromosome(depots);
             chromosome.routeSchedulingFirstPart();
+            chromosome.routeSchedulingSecondPart();
+            chromosome.updateFitnessByTotalDistance();
             this.population.add(chromosome);
         }
         this.customers = null;
@@ -417,35 +421,58 @@ public class Solver {
     public void runGA() {
         System.out.println("Population size: " + this.population.size());
         for (int generation = 0; generation < this.maxGeneration; generation++) {
-            List<Chromosome> newPopulation = new ArrayList<>();
-            // TODO parallellize this, one thread for each i
-            for (int i = 0; i < this.population.size() / 2; i++) {
-                Chromosome[] parents = tournamentSelection(2); // Note that these are not copies
-                Chromosome[] offsprings = crossover(parents[0], parents[1]);
-                if (generation % this.apprate == 0) {
-                    // Apply inter-depot mutation every 10th generation for example
-                    // TODO parallellize
-                    interDepotMutation(offsprings[0]);
-                    interDepotMutation(offsprings[1]);
-                } else {
-                    // Intra-depot mutation
-                    // Selects a random depot to perform mutation on
-                    intraDepotMutation(Helper.getRandomElementFromList(offsprings[0].depots));
-                    intraDepotMutation(Helper.getRandomElementFromList(offsprings[1].depots));
+            List<Chromosome> newPopulationSync = Collections.synchronizedList(new ArrayList<>());
+            this.customersLeft = new AtomicCounter(this.population.size() / 2);
+
+            List<Thread> threads = new ArrayList<>();
+
+            final boolean interDepot = generation % this.apprate == 0;
+            for (int i = 0; i < 24; i++) {
+                threads.add(new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        while (customersLeft.value() > 0) {
+                            customersLeft.decrement();
+                            Chromosome[] parents = tournamentSelection(2); // Note that these are not copies
+                            Chromosome[] offsprings = crossover(parents[0], parents[1]);
+                            if (interDepot) {
+                                // Apply inter-depot mutation every 10th generation for example
+                                // TODO parallellize
+                                interDepotMutation(offsprings[0]);
+                                interDepotMutation(offsprings[1]);
+                            } else {
+                                // Intra-depot mutation
+                                // Selects a random depot to perform mutation on
+                                intraDepotMutation(Helper.getRandomElementFromList(offsprings[0].depots));
+                                intraDepotMutation(Helper.getRandomElementFromList(offsprings[1].depots));
+                            }
+                            offsprings[0].updateFitnessByTotalDistance();
+                            offsprings[1].updateFitnessByTotalDistance();
+
+                            newPopulationSync.add(offsprings[0]);
+                            newPopulationSync.add(offsprings[1]);
+                        }
+                    }
+                }));
+            }
+
+            for (Thread t : threads) {
+                t.start();
+            }
+
+            for (Thread t : threads) {
+                try {
+                    t.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-                newPopulation.add(offsprings[0]);
-                newPopulation.add(offsprings[1]);
             }
 
-            for (Chromosome chromosome : newPopulation) {
-                chromosome.updateFitnessByTotalDistance();
-            }
-
+            List<Chromosome> newPopulation = new ArrayList<>(newPopulationSync);
             elitism(newPopulation);
 
             double bestFitness = Double.POSITIVE_INFINITY;
             for (Chromosome chromosome : this.population) {
-                chromosome.updateFitnessByTotalDistance();
                 if (chromosome.fitness < bestFitness) {
                     bestFitness = chromosome.fitness;
                 }
