@@ -23,6 +23,7 @@ public class Solver extends Thread {
     double tournamentSelectionNumber;
     double crossoverInsertionNumber;
     int apprate;
+    boolean verbose;
 
     // From ProblemParser
     int maxVehicesPerDepot; // TODO use this somewhere
@@ -41,6 +42,7 @@ public class Solver extends Thread {
         this.tournamentSelectionNumber = configParser.tournamentSelectionNumber;
         this.crossoverInsertionNumber = configParser.crossoverInsertionNumber;
         this.apprate = configParser.apprate;
+        this.verbose = configParser.verbose;
 
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
         this.depots = problemParser.depots;
@@ -147,6 +149,11 @@ public class Solver extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public double bestFitness() {
+        // Given that the population is already sorted.
+        return this.population.get(0).fitness;
     }
 
     Chromosome[] tournamentSelection(int selection_size) {
@@ -419,7 +426,9 @@ public class Solver extends Thread {
     }
 
     public void runGA() {
-        System.out.println("Population size: " + this.population.size());
+        if (this.verbose) {
+            System.out.println("Population size: " + this.population.size());
+        }
         for (int generation = 0; generation < this.maxGeneration; generation++) {
             List<Chromosome> newPopulationSync = Collections.synchronizedList(new ArrayList<>());
             this.customersLeft = new AtomicCounter(this.population.size() / 2);
@@ -478,7 +487,9 @@ public class Solver extends Thread {
                 }
             }
 
-            System.out.println("Best fitness: " + bestFitness);
+            if (this.verbose) {
+                System.out.println("Best fitness: " + bestFitness);
+            }
         }
     }
 

@@ -20,3 +20,5 @@ crossover_insertion_number: 1.0
 
 # Do inter-depot mutation (instead of intra-depot) every APPRATE generation
 APPRATE: 10
+
+verbose: true

@@ -19,6 +19,7 @@ public class ConfigParser {
     double tournamentSelectionNumber;
     double crossoverInsertionNumber;
     int apprate;
+    boolean verbose;
 
     Yaml yaml = new Yaml();
 
@@ -35,6 +36,7 @@ public class ConfigParser {
             this.tournamentSelectionNumber = (double) obj.get("tournament_selection_number");
             this.crossoverInsertionNumber = (double) obj.get("crossover_insertion_number");
             this.apprate = (int) obj.get("APPRATE");
+            this.verbose = (boolean) obj.get("verbose");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
