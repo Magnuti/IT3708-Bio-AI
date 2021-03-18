@@ -58,6 +58,7 @@ public class Depot {
             if (this.getMaxVehicleLoad() >= usedCapacity + customer.getDemand()
                     && this.getMaxRouteDistance() >= routeLength + distance
                             + Helper.euclidianDistance(customer.getX(), customer.getY(), this.getX(), this.getY())) {
+                // Successfully adds the customer to the current route
                 route.customers.add(customer);
                 usedCapacity += customer.getDemand();
                 routeLength += distance;
@@ -65,24 +66,40 @@ public class Depot {
                 fromY = customer.getY();
                 prevCustomer = customer;
             } else {
-                routeLength += Helper.euclidianDistance(prevCustomer.getX(), prevCustomer.getY(), this.getX(),
-                        this.getY()); // Distance back to the depot
-                route.routeLength = routeLength;
-                route.usedCapacity = usedCapacity;
-                this.routes.add(route);
-                route = new Route();
-                fromX = this.getX();
-                fromY = this.getY();
-                usedCapacity = customer.getDemand();
-                routeLength = distance;
-                route.customers.add(customer);
-                fromX = customer.getX();
-                fromY = customer.getY();
+                if (prevCustomer == null) {
+                    // This happens if the first customer is too far out or too heavy
+                    route.customers.add(customer);
+                    route.routeLength = Helper.euclidianDistance(this.getX(), this.getY(), customer.getX(),
+                            customer.getY()) * 2;
+                    route.usedCapacity = customer.getDemand();
+                    this.routes.add(route);
+
+                    route = new Route();
+                } else {
+                    // Sends the current route back to the depot and starts a new one
+                    routeLength += Helper.euclidianDistance(prevCustomer.getX(), prevCustomer.getY(), this.getX(),
+                            this.getY()); // Distance back to the depot
+                    route.routeLength = routeLength;
+                    route.usedCapacity = usedCapacity;
+                    this.routes.add(route);
+
+                    route = new Route();
+                    fromX = this.getX();
+                    fromY = this.getY();
+                    distance = Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
+                    usedCapacity = customer.getDemand();
+                    routeLength = distance;
+                    route.customers.add(customer);
+                    fromX = customer.getX();
+                    fromY = customer.getY();
+                    prevCustomer = customer;
+                }
 
                 // * Skip sanity check for performance gain
-                if (usedCapacity > this.getMaxVehicleLoad() || routeLength > this.getMaxRouteDistance()) {
-                    throw new Error("A customer is invalid for a depot!");
-                }
+                // if (usedCapacity > this.getMaxVehicleLoad() || routeLength >
+                // this.getMaxRouteDistance()) {
+                // throw new Error("A customer is invalid for a depot!");
+                // }
             }
         }
         route.routeLength = routeLength;

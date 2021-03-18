@@ -2,9 +2,11 @@ package mdvrp;
 
 public class App {
     public static void main(String[] args) {
-        runSingle();
-        // runAll();
+        // runSingle();
+        runAll();
     }
+
+    // TODO add possibility to early stop
 
     private static void runSingle() {
         ConfigParser configParser = new ConfigParser();
@@ -28,8 +30,13 @@ public class App {
         configParser.parseConfig();
         configParser.verbose = false;
 
-        for (int i = 1; i < 24; i++) {
-            configParser.inputFile = "p0" + i;
+        for (int i = 10; i < 24; i++) {
+            // TODO read file names in test_data instead
+            if (i < 10) {
+                configParser.inputFile = "p0" + i;
+            } else {
+                configParser.inputFile = "p" + i;
+            }
             System.out.println("Input file: " + configParser.inputFile);
             ProblemParser problemParser = new ProblemParser();
             problemParser.parseFile(configParser.inputFile);

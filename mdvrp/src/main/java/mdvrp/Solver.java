@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -30,6 +31,8 @@ public class Solver extends Thread {
     List<Depot> depots;
     List<Customer> customers;
 
+    int customerCount; // ! temp
+
     private List<Chromosome> population = new ArrayList<>();
     private AtomicCounter customersLeft;
 
@@ -47,6 +50,7 @@ public class Solver extends Thread {
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
         this.depots = problemParser.depots;
         this.customers = problemParser.customers;
+        this.customerCount = this.customers.size(); // ! Temp
     }
 
     public void initDepotAssignment() {
@@ -252,6 +256,11 @@ public class Solver extends Thread {
     }
 
     Chromosome[] crossover(Chromosome parent1, Chromosome parent2) {
+        // Performs crossover between two chromosomes.
+        // Note that after crossover, the affected depots in each chromosome can consist
+        // of illegal
+        // routes (e.g., routes that are too long, customers that are too far away, too
+        // heavy etc.)
         Chromosome offspring1 = new Chromosome(parent1);
         Chromosome offspring2 = new Chromosome(parent2);
 
@@ -343,9 +352,17 @@ public class Solver extends Thread {
 
         InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer, depot);
 
-        // No need to check if there are feasible locations here because it must be at
-        // least one, since the removed location was feasible.
-        insertCustomerAtBestLocation(icaf, depot, customer);
+        if (icaf.maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList()).contains(true)) {
+            // Insert at best feasible location
+            insertCustomerAtBestLocation(icaf, depot, customer);
+        } else {
+            // Create new route
+            Route route = new Route();
+            route.customers.add(customer);
+            // TODO check that maxRoutes is not breached
+            depot.routes.add(route);
+            depot.recalculateUsedRouteLengthAndCapacity(route);
+        }
 
         depot.rebuildCustomerList();
     }
@@ -369,7 +386,7 @@ public class Solver extends Thread {
         route1.customers.add(customer2);
         route2.customers.add(customer1);
         depot.rebuildCustomerList();
-        depot.routeSchedulingFirstPart();
+        depot.routeSchedulingFirstPart(); // TODO try without as well
         depot.routeSchedulingSecondPart();
     }
 
@@ -407,7 +424,6 @@ public class Solver extends Thread {
         toDepot.customers.add(customerToSwap);
         toDepot.routeSchedulingFirstPart();
         toDepot.routeSchedulingSecondPart();
-
     }
 
     void elitism(List<Chromosome> newPopulation) {
@@ -490,6 +506,41 @@ public class Solver extends Thread {
             if (this.verbose) {
                 System.out.println("Best fitness: " + bestFitness);
             }
+
+            // // ! Test start
+            // for (Chromosome chromosome : this.population) {
+            // Set<Customer> customers = new HashSet<>();
+            // Set<Customer> customersInRoutes = new HashSet<>();
+            // for (Depot depot : chromosome.depots) {
+            // for (Route route : depot.routes) {
+            // for (Customer c : route.customers) {
+            // if (customersInRoutes.contains(c)) {
+            // // System.err.println("Duplicate customer in route...");
+            // throw new Error("Duplicate customer in route...");
+            // } else {
+            // customersInRoutes.add(c);
+            // }
+            // }
+            // }
+            // for (Customer customer : depot.customers) {
+            // if (customers.contains(customer)) {
+            // // System.err.println("Duplicate customer...");
+            // throw new Error("Duplicate customer...");
+            // } else {
+            // customers.add(customer);
+            // }
+            // }
+            // }
+            // if (customers.size() != this.customerCount || customersInRoutes.size() !=
+            // this.customerCount) {
+            // System.err.println("Invalid customer count");
+            // System.err.println(this.customerCount);
+            // System.err.println(customers.size());
+            // System.err.println(customersInRoutes.size());
+            // throw new Error();
+            // }
+            // }
+            // // ! Test end
         }
     }
 
