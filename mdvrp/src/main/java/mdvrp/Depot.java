@@ -56,59 +56,59 @@ public class Depot {
         Route route = new Route();
         int fromX = this.getX();
         int fromY = this.getY();
-        double routeLength = 0.0;
-        double usedCapacity = 0.0;
         Customer prevCustomer = null;
+        double prevCustomersDistanceHome = 0.0;
         for (Customer customer : this.customers) {
             double distance = Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
-            if (this.getMaxVehicleLoad() >= usedCapacity + customer.getDemand()
-                    && this.getMaxRouteDistance() >= routeLength + distance
-                            + Helper.euclidianDistance(customer.getX(), customer.getY(), this.getX(), this.getY())) {
+            double distanceHome = Helper.euclidianDistance(customer.getX(), customer.getY(), this.getX(), this.getY());
+            if (this.getMaxVehicleLoad() >= route.usedCapacity + customer.getDemand()
+                    && this.getMaxRouteDistance() >= route.routeLength + distance + distanceHome) {
                 // Successfully adds the customer to the current route
                 route.customers.add(customer);
-                usedCapacity += customer.getDemand();
-                routeLength += distance;
+                route.routeLength += distance;
+                route.usedCapacity += customer.getDemand();
                 fromX = customer.getX();
                 fromY = customer.getY();
                 prevCustomer = customer;
+                prevCustomersDistanceHome = distanceHome;
             } else {
                 if (prevCustomer == null) {
                     // This happens if the first customer is too far out or too heavy
                     route.customers.add(customer);
-                    route.routeLength = Helper.euclidianDistance(this.getX(), this.getY(), customer.getX(),
-                            customer.getY()) * 2;
+                    route.routeLength = distanceHome * 2;
                     route.usedCapacity = customer.getDemand();
                     this.routes.add(route);
 
                     route = new Route();
                 } else {
                     // Sends the current route back to the depot and starts a new one
-                    routeLength += Helper.euclidianDistance(prevCustomer.getX(), prevCustomer.getY(), this.getX(),
-                            this.getY()); // Distance back to the depot
-                    route.routeLength = routeLength;
-                    route.usedCapacity = usedCapacity;
+                    route.routeLength += prevCustomersDistanceHome;
                     this.routes.add(route);
 
                     route = new Route();
-                    fromX = this.getX();
-                    fromY = this.getY();
-                    distance = Helper.euclidianDistance(fromX, fromY, customer.getX(), customer.getY());
-                    usedCapacity = customer.getDemand();
-                    routeLength = distance;
                     route.customers.add(customer);
+                    distance = Helper.euclidianDistance(this.getX(), this.getY(), customer.getX(), customer.getY());
+                    route.routeLength = distance;
+                    route.usedCapacity = customer.getDemand();
                     fromX = customer.getX();
                     fromY = customer.getY();
                     prevCustomer = customer;
+                    prevCustomersDistanceHome = distance;
                 }
 
-                // * Skip sanity check for performance gain
-                // if (usedCapacity > this.getMaxVehicleLoad() || routeLength >
+                // // * Skip sanity check for performance gain
+                // if (route.usedCapacity > this.getMaxVehicleLoad() || route.routeLength >
                 // this.getMaxRouteDistance()) {
                 // throw new Error("A customer is invalid for a depot!");
                 // }
             }
         }
-        route.routeLength = routeLength;
+        if (route.customers.isEmpty()) {
+            // This happens if the first customer is illegal and it is the only customer,
+            // then we do not want to add an empty route
+            return;
+        }
+        route.routeLength += prevCustomersDistanceHome;
         this.routes.add(route);
     }
 
