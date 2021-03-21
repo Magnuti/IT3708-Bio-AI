@@ -22,6 +22,7 @@ public class Solver extends Thread {
     double crossoverInsertionNumber;
     int apprate;
     boolean verbose;
+    int saveInterval;
 
     // From ProblemParser
     int maxVehicesPerDepot; // TODO use this somewhere
@@ -43,6 +44,7 @@ public class Solver extends Thread {
         this.crossoverInsertionNumber = configParser.crossoverInsertionNumber;
         this.apprate = configParser.apprate;
         this.verbose = configParser.verbose;
+        this.saveInterval = configParser.saveInterval;
 
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
         this.depots = problemParser.depots;
@@ -110,23 +112,15 @@ public class Solver extends Thread {
         this.depots = null;
     }
 
-    public boolean filterOutIllegalChromosomes() {
-        Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
-        double bestFitness = this.population.get(0).fitness; // Can be both legal and illegal
-        int beforeSize = this.population.size();
-        this.population = this.population.stream().filter(x -> x.tooManyRoutes == 0).collect(Collectors.toList());
-        System.out
-                .println("Total population size: " + beforeSize + ", legal population size: " + this.population.size());
-        if (this.population.isEmpty()) {
-            System.out.println("No legal solutions found... best illegal fitness was: " + bestFitness);
-            return false;
-        }
-        return true;
-    }
-
     public void saveBest() {
         Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
-        List<Depot> depots = this.population.get(0).depots;
+        List<Chromosome> legalPopulation = this.population.stream().filter(x -> x.tooManyRoutes == 0)
+                .collect(Collectors.toList());
+        if (legalPopulation.isEmpty()) {
+            return;
+        }
+
+        List<Depot> depots = legalPopulation.get(0).depots;
 
         try {
             Path path = Paths.get("solutions");
@@ -539,8 +533,12 @@ public class Solver extends Thread {
 
             elitism(newPopulation, elitismCount);
 
+            if (generation % this.saveInterval == 0 && generation > 0) {
+                this.saveBest();
+            }
+
             // Run every 50th time for speedup
-            if (generation % 50 == 0) {
+            if (generation % 50 == 0 && generation > 0) {
                 double bestLegalFitness = Double.POSITIVE_INFINITY;
                 double averageFitness = 0.0;
                 for (Chromosome chromosome : this.population) {
@@ -552,11 +550,15 @@ public class Solver extends Thread {
                 }
                 if (bestLegalFitness <= this.stopThreshold) {
                     System.out.println(
-                            ConsoleColors.GREEN + "Early stopped at generation: " + generation + ConsoleColors.RESET);
+                            ConsoleColors.GREEN + "\nEarly stopped at generation: " + generation + ConsoleColors.RESET);
                     return;
                 }
                 if (this.verbose) {
                     System.out.println("Generation: " + generation + ", Best fitness: "
+                            + Helper.roundDouble(bestLegalFitness) + ", average fitness: "
+                            + Helper.roundDouble(averageFitness / (double) this.population.size()));
+                } else {
+                    System.out.print("\rGeneration: " + generation + ", Best fitness: "
                             + Helper.roundDouble(bestLegalFitness) + ", average fitness: "
                             + Helper.roundDouble(averageFitness / (double) this.population.size()));
                 }

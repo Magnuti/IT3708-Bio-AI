@@ -20,6 +20,7 @@ public class ConfigParser {
     double crossoverInsertionNumber;
     int apprate;
     boolean verbose;
+    int saveInterval;
 
     Yaml yaml = new Yaml();
 
@@ -37,6 +38,7 @@ public class ConfigParser {
             this.crossoverInsertionNumber = (double) obj.get("crossover_insertion_number");
             this.apprate = (int) obj.get("APPRATE");
             this.verbose = (boolean) obj.get("verbose");
+            this.saveInterval = (int) obj.get("save_interval");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
