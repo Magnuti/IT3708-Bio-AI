@@ -18,6 +18,8 @@ public class ConfigParser {
     double bound;
     double tournamentSelectionNumber;
     double crossoverInsertionNumber;
+    double intraDepotMutationRate;
+    double interDepotMutationRate;
     int apprate;
     boolean verbose;
     int saveInterval;
@@ -36,6 +38,8 @@ public class ConfigParser {
             this.bound = (double) obj.get("bound");
             this.tournamentSelectionNumber = (double) obj.get("tournament_selection_number");
             this.crossoverInsertionNumber = (double) obj.get("crossover_insertion_number");
+            this.intraDepotMutationRate = (double) obj.get("intra_depot_mutation_rate");
+            this.interDepotMutationRate = (double) obj.get("inter_depot_mutation_rate");
             this.apprate = (int) obj.get("APPRATE");
             this.verbose = (boolean) obj.get("verbose");
             this.saveInterval = (int) obj.get("save_interval");

@@ -20,6 +20,8 @@ public class Solver extends Thread {
     double bound;
     double tournamentSelectionNumber;
     double crossoverInsertionNumber;
+    double intraDepotMutationRate;
+    double interDepotMutationRate;
     int apprate;
     boolean verbose;
     int saveInterval;
@@ -40,6 +42,8 @@ public class Solver extends Thread {
         this.bound = configParser.bound;
         this.tournamentSelectionNumber = configParser.tournamentSelectionNumber;
         this.crossoverInsertionNumber = configParser.crossoverInsertionNumber;
+        this.intraDepotMutationRate = configParser.intraDepotMutationRate;
+        this.interDepotMutationRate = configParser.interDepotMutationRate;
         this.apprate = configParser.apprate;
         this.verbose = configParser.verbose;
         this.saveInterval = configParser.saveInterval;
@@ -49,11 +53,15 @@ public class Solver extends Thread {
 
         this.stopThreshold = stopThreshold;
 
-        this.initDepotAssignment(problemParser.depots, problemParser.customers);
-        this.initPopulation(problemParser.depots, problemParser.customers, configParser.populationSize);
+        List<Depot> depots = problemParser.depots;
+        List<Customer> customers = problemParser.customers;
+
+        this.initDepotAssignment(depots, customers);
+        this.initPopulation(depots, customers, configParser.populationSize);
     }
 
     private void initDepotAssignment(List<Depot> depots, List<Customer> customers) {
+        // Initializes each customer to the nearest depot
         // ? parallellize this
         for (Customer customer : customers) {
             double lowestDistance = Double.POSITIVE_INFINITY;
@@ -81,7 +89,7 @@ public class Solver extends Thread {
     }
 
     private void initPopulation(List<Depot> depots, List<Customer> customers, int populationSize) {
-        // ? try to combine this method with the one above
+        // ? parallellize this
         if (populationSize % 2 == 1) {
             System.out.println(
                     "Warning: Please keep the population size as an even number. Why? Because two parents can reproduce easily, while three is more difficult.");
@@ -221,12 +229,10 @@ public class Solver extends Thread {
         int bestInsertionIndex = 0;
         for (int i = 0; i < icaf.insertionCost.size(); i++) {
             for (int k = 0; k < icaf.insertionCost.get(i).size(); k++) {
-                if (icaf.maintainsFeasibility.get(i).get(k)) {
-                    if (icaf.insertionCost.get(i).get(k) < bestInsertionCost) {
-                        bestInsertionCost = icaf.insertionCost.get(i).get(k);
-                        bestRoute = depot.routes.get(i);
-                        bestInsertionIndex = k;
-                    }
+                if (icaf.maintainsFeasibility.get(i).get(k) && icaf.insertionCost.get(i).get(k) < bestInsertionCost) {
+                    bestInsertionCost = icaf.insertionCost.get(i).get(k);
+                    bestRoute = depot.routes.get(i);
+                    bestInsertionIndex = k;
                 }
             }
         }
@@ -246,16 +252,22 @@ public class Solver extends Thread {
                     // Create new route
                     Route route = new Route();
                     route.customers.add(customer);
-                    // TODO check that maxRoutes is not breached
                     depotToModify.routes.add(route);
                     depotToModify.recalculateUsedRouteLengthAndCapacity(route);
                 }
             } else {
                 // Insert at first entry in the list
                 // TODO look over which one to use
+                // if (depotToModify.routes.isEmpty()) {
+                // depotToModify.routes.add(0, new Route());
+                // }
                 // Route route = depotToModify.routes.get(0);
                 // route.customers.add(0, customer);
                 // depotToModify.recalculateUsedRouteLengthAndCapacity(route);
+                // depotToModify.rebuildCustomerList();
+                // depotToModify.customers.add(0, customer);
+                // depotToModify.routeSchedulingFirstPart();
+                // depotToModify.routeSchedulingSecondPart();
                 depotToModify.rebuildCustomerList();
                 depotToModify.customers.add(0, customer);
                 depotToModify.routeSchedulingFirstPart();
@@ -325,6 +337,10 @@ public class Solver extends Thread {
     }
 
     void intraDepotMutation(Depot depot) {
+        if (ThreadLocalRandom.current().nextDouble() >= this.intraDepotMutationRate) {
+            return;
+        }
+
         switch (ThreadLocalRandom.current().nextInt(3)) {
         case 0:
             reversalMutation(depot);
@@ -372,7 +388,6 @@ public class Solver extends Thread {
             // Create new route
             Route route = new Route();
             route.customers.add(customer);
-            // TODO check that maxRoutes is not breached ?
             depot.routes.add(route);
             depot.recalculateUsedRouteLengthAndCapacity(route);
         }
@@ -404,11 +419,16 @@ public class Solver extends Thread {
     }
 
     void interDepotMutation(Chromosome chromosome) {
+        if (ThreadLocalRandom.current().nextDouble() >= this.interDepotMutationRate) {
+            return;
+        }
+
         List<Depot> depotsWithSwappableCustomers = chromosome.depots.stream()
                 .filter(x -> x.swappableCustomers.size() > 0).collect(Collectors.toList());
         List<Depot> toRemove = new ArrayList<>();
         for (Depot depot : depotsWithSwappableCustomers) {
-            // Already full depot
+            // Already full depot, in the sense that it already have all customers it can
+            // have
             if (new HashSet<>(depot.customers).containsAll(new HashSet<>(depot.swappableCustomers))) {
                 toRemove.add(depot);
             }
@@ -428,10 +448,9 @@ public class Solver extends Thread {
             if (depot.customers.remove(customerToSwap)) {
                 depot.routeSchedulingFirstPart();
                 depot.routeSchedulingSecondPart();
+                break;
             }
         }
-
-        // TODO check if not this.maxDexVehiclesPerDepot is not breached
 
         // TODO Maybe we should insert at the best feasible location here instead
         toDepot.customers.add(customerToSwap);
@@ -534,7 +553,7 @@ public class Solver extends Thread {
             }
 
             // Run every 50th time for speedup
-            if (generation % 50 == 0 && generation > 0) {
+            if (generation % 100 == 0 && generation > 0) {
                 double bestLegalFitness = Double.POSITIVE_INFINITY;
                 double averageFitness = 0.0;
                 for (Chromosome chromosome : this.population) {
