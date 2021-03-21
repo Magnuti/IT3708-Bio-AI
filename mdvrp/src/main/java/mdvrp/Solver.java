@@ -110,14 +110,18 @@ public class Solver extends Thread {
         this.depots = null;
     }
 
-    public void filterOutIllegalChromosomes() {
+    public boolean filterOutIllegalChromosomes() {
+        Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
+        double bestFitness = this.population.get(0).fitness; // Can be both legal and illegal
         int beforeSize = this.population.size();
         this.population = this.population.stream().filter(x -> x.tooManyRoutes == 0).collect(Collectors.toList());
         System.out
                 .println("Total population size: " + beforeSize + ", legal population size: " + this.population.size());
         if (this.population.isEmpty()) {
-            throw new Error("No legal solutions found... run again?");
+            System.out.println("No legal solutions found... best illegal fitness was: " + bestFitness);
+            return false;
         }
+        return true;
     }
 
     public void saveBest() {

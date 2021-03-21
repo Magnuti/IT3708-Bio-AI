@@ -77,9 +77,10 @@ public class App {
         System.out.println(
                 "Elapsed training time: " + Helper.roundDouble((System.currentTimeMillis() - start) / 1000.0) + " s");
 
-        solver.filterOutIllegalChromosomes();
-        solver.saveBest();
-        System.out.println("Best legal fitness: " + solver.bestFitness());
+        if (solver.filterOutIllegalChromosomes()) {
+            solver.saveBest();
+            System.out.println("Best legal fitness: " + solver.bestFitness());
+        }
     }
 
     private static void runAll() {
@@ -87,7 +88,7 @@ public class App {
         configParser.parseConfig();
         configParser.verbose = false;
 
-        for (int i = 1; i < 24; i++) {
+        for (int i = 18; i < 24; i++) {
             // TODO read file names in test_data instead
             if (i < 10) {
                 configParser.inputFile = "p0" + i;
@@ -104,9 +105,10 @@ public class App {
             System.out.println("Elapsed training time: "
                     + Helper.roundDouble((System.currentTimeMillis() - start) / 1000.0) + " s");
 
-            solver.filterOutIllegalChromosomes();
-            solver.saveBest();
-            System.out.println("Best legal fitness: " + solver.bestFitness());
+            if (solver.filterOutIllegalChromosomes()) {
+                solver.saveBest();
+                System.out.println("Best legal fitness: " + solver.bestFitness());
+            }
             System.out.println("");
         }
     }

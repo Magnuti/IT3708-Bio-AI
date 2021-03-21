@@ -50,8 +50,8 @@ public class ProblemParser {
             }
             scanner.close();
         } catch (FileNotFoundException e) {
-            System.out.println("An error occurred.");
             e.printStackTrace();
+            throw new Error("Cannot read the given file: " + fileName);
         }
     }
 }
