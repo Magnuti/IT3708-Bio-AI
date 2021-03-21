@@ -7,8 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -16,7 +14,6 @@ import java.util.Collections;
 
 public class Solver extends Thread {
     // From ConfigParser
-    int populationSize;
     int maxGeneration;
     double eliteRatio;
     double crossoverChance;
@@ -31,13 +28,13 @@ public class Solver extends Thread {
     List<Depot> depots;
     List<Customer> customers;
 
-    int customerCount; // ! temp
+    double stopThreshold;
+
+    // int customerCount; // ! temp
 
     private List<Chromosome> population = new ArrayList<>();
-    private AtomicCounter customersLeft;
 
-    public Solver(ConfigParser configParser, ProblemParser problemParser) {
-        this.populationSize = configParser.populationSize;
+    public Solver(ConfigParser configParser, ProblemParser problemParser, double stopThreshold) {
         this.maxGeneration = configParser.maxGeneration;
         this.eliteRatio = configParser.eliteRatio;
         this.crossoverChance = configParser.crossoverChance;
@@ -50,10 +47,15 @@ public class Solver extends Thread {
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
         this.depots = problemParser.depots;
         this.customers = problemParser.customers;
-        this.customerCount = this.customers.size(); // ! Temp
+        // this.customerCount = this.customers.size(); // ! Temp
+
+        this.stopThreshold = stopThreshold;
+
+        this.initDepotAssignment();
+        this.initPopulation(configParser.populationSize);
     }
 
-    public void initDepotAssignment() {
+    private void initDepotAssignment() {
         // ? parallellize this
         for (Customer customer : this.customers) {
             double lowestDistance = Double.POSITIVE_INFINITY;
@@ -80,15 +82,15 @@ public class Solver extends Thread {
         }
     }
 
-    public void initPopulation() {
+    private void initPopulation(int populationSize) {
         // ? try to combine this method with the one above
-        if (this.populationSize % 2 == 1) {
+        if (populationSize % 2 == 1) {
             System.out.println(
                     "Warning: Please keep the population size as an even number. Why? Because two parents can reproduce easily, while three is more difficult.");
-            this.populationSize--;
-            System.out.println("Using a population size of: " + this.populationSize);
+            populationSize--;
+            System.out.println("Using a population size of: " + populationSize);
         }
-        for (int i = 0; i < this.populationSize; i++) {
+        for (int i = 0; i < populationSize; i++) {
             // We need to clone depots to the different chromosomes
             List<Depot> depots = new ArrayList<>();
             for (Depot depot : this.depots) {
@@ -100,11 +102,22 @@ public class Solver extends Thread {
             Chromosome chromosome = new Chromosome(depots);
             chromosome.routeSchedulingFirstPart();
             chromosome.routeSchedulingSecondPart();
-            chromosome.updateFitnessByTotalDistance();
+            chromosome.getLegality(this.maxVehicesPerDepot);
+            chromosome.updateFitnessByTotalDistanceWithPenalty(0);
             this.population.add(chromosome);
         }
         this.customers = null;
         this.depots = null;
+    }
+
+    public void filterOutIllegalChromosomes() {
+        int beforeSize = this.population.size();
+        this.population = this.population.stream().filter(x -> x.tooManyRoutes == 0).collect(Collectors.toList());
+        System.out
+                .println("Total population size: " + beforeSize + ", legal population size: " + this.population.size());
+        if (this.population.isEmpty()) {
+            throw new Error("No legal solutions found... run again?");
+        }
     }
 
     public void saveBest() {
@@ -125,16 +138,16 @@ public class Solver extends Thread {
             for (Depot depot : depots) {
                 totalRouteLength += depot.routes.stream().map(x -> x.routeLength).reduce(0.0, Double::sum);
             }
-            fr.write(String.format(Locale.US, "%.2f", totalRouteLength));
+            fr.write(Helper.roundDouble(totalRouteLength));
             fr.write(System.lineSeparator());
             for (Depot depot : depots) {
                 for (int i = 0; i < depot.routes.size(); i++) {
                     Route route = depot.routes.get(i);
                     fr.write(Integer.toString(depot.getId()));
                     fr.write("\t");
-                    fr.write(Integer.toString(depot.getId()));
+                    fr.write(Integer.toString(i + 1));
                     fr.write("\t");
-                    fr.write(String.format(Locale.US, "%.2f", route.routeLength));
+                    fr.write(Helper.roundDouble(route.routeLength));
                     fr.write("\t");
                     fr.write(
                             Integer.toString(route.customers.stream().map(x -> x.getDemand()).reduce(0, Integer::sum)));
@@ -231,9 +244,8 @@ public class Solver extends Thread {
 
     private void crossoverInsertCustomers(List<Customer> customersToAdd, Depot depotToModify) {
         for (Customer customer : customersToAdd) {
-            InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer, depotToModify);
-
             if (ThreadLocalRandom.current().nextDouble() < this.crossoverInsertionNumber) {
+                InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer, depotToModify);
                 if (icaf.maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList())
                         .contains(true)) {
                     // Insert at best feasible location
@@ -248,19 +260,26 @@ public class Solver extends Thread {
                 }
             } else {
                 // Insert at first entry in the list
-                // TODO, call routeScheduler when we add to the first route
-                // TODO and check that no constraints are being breached
-                throw new Error();
+                // TODO look over which one to use
+                // Route route = depotToModify.routes.get(0);
+                // route.customers.add(0, customer);
+                // depotToModify.recalculateUsedRouteLengthAndCapacity(route);
+                depotToModify.rebuildCustomerList();
+                depotToModify.customers.add(0, customer);
+                depotToModify.routeSchedulingFirstPart();
+                depotToModify.routeSchedulingSecondPart();
             }
         }
     }
 
+    /**
+     * Performs crossover between two chromosomes. Note that after crossover, the
+     * affected depots in each chromosome can consist of illegal routes (e.g.,
+     * routes that are too long, customers that are too far away, too heavy etc.).
+     * 
+     * @return an arrray of length 2 with the chromosome offsprings.
+     */
     Chromosome[] crossover(Chromosome parent1, Chromosome parent2) {
-        // Performs crossover between two chromosomes.
-        // Note that after crossover, the affected depots in each chromosome can consist
-        // of illegal
-        // routes (e.g., routes that are too long, customers that are too far away, too
-        // heavy etc.)
         Chromosome offspring1 = new Chromosome(parent1);
         Chromosome offspring2 = new Chromosome(parent2);
 
@@ -293,7 +312,7 @@ public class Solver extends Thread {
                 }
             }
 
-            // TODO parallellize these
+            // ? parallellize these
             crossoverInsertCustomers(customers1, depot2);
             crossoverInsertCustomers(customers2, depot1);
 
@@ -359,7 +378,7 @@ public class Solver extends Thread {
             // Create new route
             Route route = new Route();
             route.customers.add(customer);
-            // TODO check that maxRoutes is not breached
+            // TODO check that maxRoutes is not breached ?
             depot.routes.add(route);
             depot.recalculateUsedRouteLengthAndCapacity(route);
         }
@@ -426,43 +445,54 @@ public class Solver extends Thread {
         toDepot.routeSchedulingSecondPart();
     }
 
-    void elitism(List<Chromosome> newPopulation) {
+    void elitism(List<Chromosome> newPopulation, int elitismCount) {
         // Randomly replace some % of the population with the best some % from
         // the parent population
         Collections.shuffle(newPopulation);
         Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
-        int toSwap = (int) Math.round((double) this.population.size() * this.eliteRatio);
-        if (toSwap == 0) {
-            System.out.println("Warning: elitism is not applied.");
-        }
-        for (int i = 0; i < toSwap; i++) {
+        for (int i = 0; i < elitismCount; i++) {
             newPopulation.set(i, this.population.get(i));
         }
         this.population = newPopulation;
     }
 
     public void runGA() {
+        if (this.stopThreshold == Double.NEGATIVE_INFINITY) {
+            System.out
+                    .println(ConsoleColors.YELLOW + "Running GA without a threshold stop value." + ConsoleColors.RESET);
+        }
+
+        final int elitismCount = (int) Math.round((double) this.population.size() * this.eliteRatio);
+        if (elitismCount == 0) {
+            System.out.println(ConsoleColors.YELLOW + "Warning: elitism is not applied." + ConsoleColors.RESET);
+        }
+
         if (this.verbose) {
             System.out.println("Population size: " + this.population.size());
+            System.out.println("This many legal init chromosomes: "
+                    + this.population.stream().filter(x -> x.tooManyRoutes == 0).count());
         }
+
         for (int generation = 0; generation < this.maxGeneration; generation++) {
             List<Chromosome> newPopulationSync = Collections.synchronizedList(new ArrayList<>());
-            this.customersLeft = new AtomicCounter(this.population.size() / 2);
+
+            AtomicCounter customerPairsLeft = new AtomicCounter(this.population.size() / 2);
 
             List<Thread> threads = new ArrayList<>();
 
             final boolean interDepot = generation % this.apprate == 0;
+            final int g = generation;
             for (int i = 0; i < 24; i++) {
                 threads.add(new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        while (customersLeft.value() > 0) {
-                            customersLeft.decrement();
+                        while (customerPairsLeft.value() > 0) {
+                            customerPairsLeft.decrement();
                             Chromosome[] parents = tournamentSelection(2); // Note that these are not copies
                             Chromosome[] offsprings = crossover(parents[0], parents[1]);
                             if (interDepot) {
                                 // Apply inter-depot mutation every 10th generation for example
-                                // TODO parallellize
+                                // ? parallellize
                                 interDepotMutation(offsprings[0]);
                                 interDepotMutation(offsprings[1]);
                             } else {
@@ -471,8 +501,12 @@ public class Solver extends Thread {
                                 intraDepotMutation(Helper.getRandomElementFromList(offsprings[0].depots));
                                 intraDepotMutation(Helper.getRandomElementFromList(offsprings[1].depots));
                             }
-                            offsprings[0].updateFitnessByTotalDistance();
-                            offsprings[1].updateFitnessByTotalDistance();
+
+                            offsprings[0].getLegality(maxVehicesPerDepot);
+                            offsprings[1].getLegality(maxVehicesPerDepot);
+
+                            offsprings[0].updateFitnessByTotalDistanceWithPenalty(g);
+                            offsprings[1].updateFitnessByTotalDistanceWithPenalty(g);
 
                             newPopulationSync.add(offsprings[0]);
                             newPopulationSync.add(offsprings[1]);
@@ -494,17 +528,34 @@ public class Solver extends Thread {
             }
 
             List<Chromosome> newPopulation = new ArrayList<>(newPopulationSync);
-            elitism(newPopulation);
 
-            double bestFitness = Double.POSITIVE_INFINITY;
-            for (Chromosome chromosome : this.population) {
-                if (chromosome.fitness < bestFitness) {
-                    bestFitness = chromosome.fitness;
+            // Avoids some funky race condition. Can be fixed by adding a proper
+            // read-and-set-if thread safe variable
+            newPopulation = newPopulation.subList(0, this.population.size());
+
+            elitism(newPopulation, elitismCount);
+
+            // Run every 50th time for speedup
+            if (generation % 50 == 0) {
+                double bestLegalFitness = Double.POSITIVE_INFINITY;
+                double averageFitness = 0.0;
+                for (Chromosome chromosome : this.population) {
+                    averageFitness += chromosome.fitness;
+                    // We only measure the legal individuals in the population
+                    if (chromosome.fitness < bestLegalFitness && chromosome.tooManyRoutes == 0) {
+                        bestLegalFitness = chromosome.fitness;
+                    }
                 }
-            }
-
-            if (this.verbose) {
-                System.out.println("Best fitness: " + bestFitness);
+                if (bestLegalFitness <= this.stopThreshold) {
+                    System.out.println(
+                            ConsoleColors.GREEN + "Early stopped at generation: " + generation + ConsoleColors.RESET);
+                    return;
+                }
+                if (this.verbose) {
+                    System.out.println("Generation: " + generation + ", Best fitness: "
+                            + Helper.roundDouble(bestLegalFitness) + ", average fitness: "
+                            + Helper.roundDouble(averageFitness / (double) this.population.size()));
+                }
             }
 
             // // ! Test start

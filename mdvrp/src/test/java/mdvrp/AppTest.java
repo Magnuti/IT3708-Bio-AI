@@ -22,6 +22,7 @@ public class AppTest {
         depot1.customers.add(customer1);
         depot1.customers.add(customer2);
         depot1.routeSchedulingFirstPart();
+        depot1.routeSchedulingSecondPart();
         List<Depot> depots = new ArrayList<>();
         depots.add(depot1);
         depots.add(depot2);

@@ -44,6 +44,12 @@ public class Depot {
         this.y = y;
     }
 
+    /**
+     * Builds the routes from the information in the depot's customer list, such
+     * that the route length and capacity is not breached. Note that this can lead
+     * to more routes than allowed for a single depot, so that constraint must be
+     * handled somewhere else.
+     */
     public void routeSchedulingFirstPart() {
         this.routes.clear();
 
@@ -107,7 +113,58 @@ public class Depot {
     }
 
     public void routeSchedulingSecondPart() {
-        // TODO
+        if (this.routes.size() < 2) {
+            return;
+        }
+
+        // for (int i = 0; i < this.routes.size(); i++) {
+        // int next_i = i + 1;
+        // if (i == this.routes.size() - 1) {
+        // next_i = 0;
+        // }
+        // Route route = this.routes.get(i);
+        for (int i = this.routes.size() - 2; i > -2; i--) {
+            // Iterates the routes backwards. The reasoning is that the last route is
+            // probably not full, so we should start by appending a possible customer to
+            // that route instead of trying to fill routes that are already full as could
+            // hvae happened if we had started with the first route.
+            int next_i = i + 1;
+            Route route;
+            if (i == -1) {
+                route = this.routes.get(this.routes.size() - 1);
+            } else {
+                route = this.routes.get(i);
+            }
+
+            Route nextRoute = this.routes.get(next_i);
+            double cost = route.routeLength + nextRoute.routeLength;
+            Customer customer = route.customers.get(route.customers.size() - 1);
+
+            // Cache stuff
+            double routeLength = route.routeLength;
+            double routeCapacity = route.usedCapacity;
+            double nextRouteLength = nextRoute.routeLength;
+            double nextRouteCapacity = nextRoute.usedCapacity;
+
+            route.customers.remove(customer);
+            nextRoute.customers.add(0, customer);
+            this.recalculateUsedRouteLengthAndCapacity(route);
+            this.recalculateUsedRouteLengthAndCapacity(nextRoute);
+            double newCost = route.routeLength + nextRoute.routeLength;
+            if (nextRoute.routeLength <= this.maxRouteDistance && nextRoute.usedCapacity <= this.maxVehicleLoad
+                    && newCost < cost) {
+                // Feasible and better, so we keep it
+                continue;
+            } else {
+                // Not feasible or not better --> roll back
+                route.customers.add(customer);
+                nextRoute.customers.remove(0);
+                route.routeLength = routeLength;
+                route.usedCapacity = routeCapacity;
+                nextRoute.routeLength = nextRouteLength;
+                nextRoute.usedCapacity = nextRouteCapacity;
+            }
+        }
     }
 
     public List<Customer> getCustomers() {
