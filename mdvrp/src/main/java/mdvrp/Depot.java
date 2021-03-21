@@ -2,6 +2,7 @@ package mdvrp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Depot {
     private int id;
@@ -165,6 +166,9 @@ public class Depot {
                 nextRoute.usedCapacity = nextRouteCapacity;
             }
         }
+
+        // Remove all routes that lost all customers
+        this.routes = this.routes.stream().filter(x -> !x.customers.isEmpty()).collect(Collectors.toList());
     }
 
     public List<Customer> getCustomers() {

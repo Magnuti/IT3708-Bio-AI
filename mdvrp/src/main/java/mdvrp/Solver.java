@@ -25,9 +25,7 @@ public class Solver extends Thread {
     int saveInterval;
 
     // From ProblemParser
-    int maxVehicesPerDepot; // TODO use this somewhere
-    List<Depot> depots;
-    List<Customer> customers;
+    int maxVehicesPerDepot;
 
     double stopThreshold;
 
@@ -47,22 +45,20 @@ public class Solver extends Thread {
         this.saveInterval = configParser.saveInterval;
 
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
-        this.depots = problemParser.depots;
-        this.customers = problemParser.customers;
         // this.customerCount = this.customers.size(); // ! Temp
 
         this.stopThreshold = stopThreshold;
 
-        this.initDepotAssignment();
-        this.initPopulation(configParser.populationSize);
+        this.initDepotAssignment(problemParser.depots, problemParser.customers);
+        this.initPopulation(problemParser.depots, problemParser.customers, configParser.populationSize);
     }
 
-    private void initDepotAssignment() {
+    private void initDepotAssignment(List<Depot> depots, List<Customer> customers) {
         // ? parallellize this
-        for (Customer customer : this.customers) {
+        for (Customer customer : customers) {
             double lowestDistance = Double.POSITIVE_INFINITY;
             Depot bestDepot = null;
-            for (Depot depot : this.depots) {
+            for (Depot depot : depots) {
                 double distance = Helper.euclidianDistance(depot.getX(), depot.getY(), customer.getX(),
                         customer.getY());
                 if (distance < lowestDistance) {
@@ -73,7 +69,7 @@ public class Solver extends Thread {
             bestDepot.customers.add(customer);
 
             double bound = this.bound;
-            for (Depot depot : this.depots) {
+            for (Depot depot : depots) {
                 double min = Helper.euclidianDistance(customer.getX(), customer.getY(), bestDepot.getX(),
                         bestDepot.getY());
                 if ((Helper.euclidianDistance(customer.getX(), customer.getY(), depot.getX(), depot.getY()) - min)
@@ -84,7 +80,7 @@ public class Solver extends Thread {
         }
     }
 
-    private void initPopulation(int populationSize) {
+    private void initPopulation(List<Depot> depots, List<Customer> customers, int populationSize) {
         // ? try to combine this method with the one above
         if (populationSize % 2 == 1) {
             System.out.println(
@@ -94,22 +90,20 @@ public class Solver extends Thread {
         }
         for (int i = 0; i < populationSize; i++) {
             // We need to clone depots to the different chromosomes
-            List<Depot> depots = new ArrayList<>();
-            for (Depot depot : this.depots) {
+            List<Depot> depotsCopy = new ArrayList<>();
+            for (Depot depot : depots) {
                 Depot depotToAdd = new Depot(depot);
                 // Initialize random routes for each depot per chromosome
                 Collections.shuffle(depotToAdd.customers);
-                depots.add(depotToAdd);
+                depotsCopy.add(depotToAdd);
             }
-            Chromosome chromosome = new Chromosome(depots);
+            Chromosome chromosome = new Chromosome(depotsCopy);
             chromosome.routeSchedulingFirstPart();
             chromosome.routeSchedulingSecondPart();
             chromosome.getLegality(this.maxVehicesPerDepot);
             chromosome.updateFitnessByTotalDistanceWithPenalty(0);
             this.population.add(chromosome);
         }
-        this.customers = null;
-        this.depots = null;
     }
 
     public void saveBest() {
@@ -286,8 +280,10 @@ public class Solver extends Thread {
             Depot depot2 = Helper.getRandomElementFromList(offspring2.depots);
 
             // These needs to be copied because we don't want them to change
-            List<Customer> customers1 = new ArrayList<>(Helper.getRandomElementFromList(depot1.routes).customers);
-            List<Customer> customers2 = new ArrayList<>(Helper.getRandomElementFromList(depot2.routes).customers);
+            List<Customer> customers1 = depot1.routes.isEmpty() ? new ArrayList<>()
+                    : new ArrayList<>(Helper.getRandomElementFromList(depot1.routes).customers);
+            List<Customer> customers2 = depot2.routes.isEmpty() ? new ArrayList<>()
+                    : new ArrayList<>(Helper.getRandomElementFromList(depot2.routes).customers);
 
             // Removes the customers from the chromosome
             for (Customer customer : customers1) {
