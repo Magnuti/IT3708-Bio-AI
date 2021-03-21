@@ -62,8 +62,6 @@ public class App {
     }
 
     private static void runSingle() {
-        // TODO add intermediate saves
-
         ConfigParser configParser = new ConfigParser();
         configParser.parseConfig();
         System.out.println("Input file: " + configParser.inputFile);
