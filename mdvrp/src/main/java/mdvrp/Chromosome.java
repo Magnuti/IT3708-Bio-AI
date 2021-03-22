@@ -22,7 +22,6 @@ public class Chromosome {
     }
 
     public void routeSchedulingFirstPart() {
-        // TODO parallellize this
         for (Depot depot : this.depots) {
             depot.routeSchedulingFirstPart();
         }
@@ -41,13 +40,15 @@ public class Chromosome {
             fitness += depot.routes.stream().map(x -> x.routeLength).reduce(0.0, Double::sum);
         }
         // Distance-based penalty
+        double penaltyWeight = 1000.0;
+        fitness += penaltyWeight * this.tooManyRoutes;
 
-        // TODO experiment with theese, static vs. dynamic (i.e., with time) and weights
-        double penaltyWeight = 300.0;
-        // fitness += penaltyWeight * Math.pow((double) this.tooManyRoutes, 2);
-        double time = ((double) generation + 2000) / 2000.0; // * 4350
+        // experiment with theese, static vs. dynamic (i.e., with time) and weights
+        // fitness += penaltyWeight * Math.pow((double) this.tooManyRoutes, 1.4);
+        // double time = ((double) generation + 2000) / 2000.0; // * 4350
         // double time = 1.0 + (double) generation / 10000.0;
-        fitness += penaltyWeight * (double) this.tooManyRoutes * time;
+        // because earlier individuals arent recalculated
+        // fitness += penaltyWeight * (double) this.tooManyRoutes * time;
         this.fitness = fitness;
     }
 
