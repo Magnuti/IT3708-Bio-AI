@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -32,7 +31,7 @@ public class Solver extends Thread {
 
     double stopThreshold;
 
-    int customerCount; // ! temp
+    // int customerCount; // ! temp
 
     private List<Chromosome> population = new ArrayList<>();
 
@@ -50,7 +49,7 @@ public class Solver extends Thread {
         this.saveInterval = configParser.saveInterval;
 
         this.maxVehicesPerDepot = problemParser.maxVehicesPerDepot;
-        this.customerCount = problemParser.customers.size(); // ! Temp
+        // this.customerCount = problemParser.customers.size(); // ! Temp
 
         this.stopThreshold = stopThreshold;
 
@@ -264,21 +263,12 @@ public class Solver extends Thread {
                 }
             } else {
                 // Insert at first entry in the list
-                // TODO look over which one to use
                 if (depotToModify.routes.isEmpty()) {
                     depotToModify.routes.add(0, new Route());
                 }
                 Route route = depotToModify.routes.get(0);
                 route.customers.add(0, customer);
                 depotToModify.recalculateUsedRouteLengthAndCapacity(route);
-                // depotToModify.rebuildCustomerList();
-                // depotToModify.customers.add(0, customer);
-                // depotToModify.routeSchedulingFirstPart();
-                // depotToModify.routeSchedulingSecondPart();
-                // depotToModify.rebuildCustomerList();
-                // depotToModify.customers.add(0, customer);
-                // depotToModify.routeSchedulingFirstPart();
-                // depotToModify.routeSchedulingSecondPart();
             }
         }
     }
@@ -366,7 +356,7 @@ public class Solver extends Thread {
     }
 
     void reversalMutation(Depot depot) {
-        // TODO select one random route and reverse a sublist of it
+        // This works on a single random route, not the entire depot
         if (depot.routes.isEmpty()) {
             return;
         }
@@ -375,20 +365,11 @@ public class Solver extends Thread {
         int endIndex = startIndex + 1 + ThreadLocalRandom.current().nextInt(route.customers.size() - startIndex);
         Collections.reverse(route.customers.subList(startIndex, endIndex));
         depot.recalculateUsedRouteLengthAndCapacity(route);
-
-        // if (depot.customers.isEmpty()) {
-        // return;
-        // }
-        // int startIndex = ThreadLocalRandom.current().nextInt(depot.customers.size());
-        // int endIndex = startIndex + 1 +
-        // ThreadLocalRandom.current().nextInt(depot.customers.size() - startIndex);
-        // Collections.reverse(depot.customers.subList(startIndex, endIndex));
-        // depot.routeSchedulingFirstPart();
-        // depot.routeSchedulingSecondPart();
     }
 
     void singleCustomerReRouting(Depot depot) {
-        // TODO simple just remove the customer and calcualte the best
+        // Removes a random customer from a random route and places it at the best
+        // possible location.
         if (depot.routes.isEmpty()) {
             return;
         }
@@ -410,39 +391,10 @@ public class Solver extends Thread {
             depot.routes.add(newRoute);
             depot.recalculateUsedRouteLengthAndCapacity(newRoute);
         }
-
-        // if (depot.customers.isEmpty()) {
-        // return;
-        // }
-
-        // Customer customer = Helper.getRandomElementFromList(depot.customers);
-        // for (Route route : depot.routes) {
-        // if (route.customers.remove(customer)) {
-        // break;
-        // }
-        // }
-
-        // InsertionCostAndFeasibility icaf = getInsertionCostAndFeasibility(customer,
-        // depot);
-
-        // if
-        // (icaf.maintainsFeasibility.stream().flatMap(List::stream).collect(Collectors.toList()).contains(true))
-        // {
-        // // Insert at best feasible location
-        // insertCustomerAtBestLocation(icaf, depot, customer);
-        // } else {
-        // // Create new route
-        // Route route = new Route();
-        // route.customers.add(customer);
-        // depot.routes.add(route);
-        // depot.recalculateUsedRouteLengthAndCapacity(route);
-        // }
-
-        // depot.rebuildCustomerList();
     }
 
     void swapping(Depot depot) {
-        // TODO simple, just move the customer and remember the indexes
+        // Swaps one customer-pair between two random routes in the depot.
 
         if (depot.routes.size() < 2) {
             return;
@@ -450,9 +402,7 @@ public class Solver extends Thread {
         List<Route> routes = Helper.getNRandomElementsFromList(depot.routes, 2);
         Route route1 = routes.get(0);
         Route route2 = routes.get(1);
-        // if (route1.customers.isEmpty() || route2.customers.isEmpty()) {
-        // return;
-        // }
+
         Customer customer1 = Helper.getRandomElementFromList(route1.customers);
         Customer customer2 = Helper.getRandomElementFromList(route2.customers);
 
@@ -461,29 +411,12 @@ public class Solver extends Thread {
 
         route1.customers.remove(index1);
         route2.customers.remove(index2);
+
         route1.customers.add(index1, customer2);
         route2.customers.add(index2, customer1);
 
         depot.recalculateUsedRouteLengthAndCapacity(route1);
         depot.recalculateUsedRouteLengthAndCapacity(route2);
-
-        // List<Route> routes = Helper.getNRandomElementsFromList(depot.routes, 2);
-        // Route route1 = routes.get(0);
-        // Route route2 = routes.get(1);
-
-        // if (route1.customers.isEmpty() || route2.customers.isEmpty()) {
-        // return;
-        // }
-        // Customer customer1 = Helper.getRandomElementFromList(route1.customers);
-        // Customer customer2 = Helper.getRandomElementFromList(route2.customers);
-
-        // route1.customers.remove(customer1);
-        // route2.customers.remove(customer2);
-        // route1.customers.add(customer2);
-        // route2.customers.add(customer1);
-        // depot.rebuildCustomerList();
-        // depot.routeSchedulingFirstPart(); // TODO try without as well
-        // depot.routeSchedulingSecondPart();
     }
 
     void interDepotMutation(Chromosome chromosome) {
@@ -541,44 +474,6 @@ public class Solver extends Thread {
             toDepot.routes.add(newRoute);
             toDepot.recalculateUsedRouteLengthAndCapacity(newRoute);
         }
-
-        // List<Depot> depotsWithSwappableCustomers = chromosome.depots.stream()
-        // .filter(x -> x.swappableCustomers.size() > 0).collect(Collectors.toList());
-        // List<Depot> toRemove = new ArrayList<>();
-        // for (Depot depot : depotsWithSwappableCustomers) {
-        // // Already full depot, in the sense that it already have all customers it can
-        // // have
-        // if (new HashSet<>(depot.customers).containsAll(new
-        // HashSet<>(depot.swappableCustomers))) {
-        // toRemove.add(depot);
-        // }
-        // }
-        // depotsWithSwappableCustomers.removeAll(toRemove);
-        // if (depotsWithSwappableCustomers.isEmpty()) {
-        // return;
-        // }
-
-        // Depot toDepot =
-        // Helper.getRandomElementFromList(depotsWithSwappableCustomers);
-        // HashSet<Customer> possibleCustomersToGet = new
-        // HashSet<>(toDepot.swappableCustomers);
-        // possibleCustomersToGet.removeAll(toDepot.customers);
-        // Customer customerToSwap = Helper.getRandomElementFromList(new
-        // ArrayList<>(possibleCustomersToGet));
-
-        // // Remove customerToSwap from the depot which contains it
-        // for (Depot depot : chromosome.depots) {
-        // if (depot.customers.remove(customerToSwap)) {
-        // depot.routeSchedulingFirstPart();
-        // depot.routeSchedulingSecondPart();
-        // break;
-        // }
-        // }
-
-        // // TODO Maybe we should insert at the best feasible location here instead
-        // toDepot.customers.add(customerToSwap);
-        // toDepot.routeSchedulingFirstPart();
-        // toDepot.routeSchedulingSecondPart();
     }
 
     void elitism(List<Chromosome> newPopulation, int elitismCount) {
