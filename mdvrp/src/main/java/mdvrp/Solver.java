@@ -488,6 +488,7 @@ public class Solver extends Thread {
             System.out.println("Population size: " + this.population.size());
             System.out.println("This many legal init chromosomes: "
                     + this.population.stream().filter(x -> x.tooManyRoutes == 0).count());
+            System.out.println("Early stopping fitness threshold: " + this.stopThreshold);
         }
 
         for (int generation = 0; generation < this.maxGeneration; generation++) {
