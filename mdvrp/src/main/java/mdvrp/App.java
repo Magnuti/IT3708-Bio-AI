@@ -54,11 +54,11 @@ public class App {
         }
     }
 
-    private static double getThreshold(String fileName) {
+    private static double getThreshold(String fileName, double default_threshold) {
         if (stopThreshold.containsKey(fileName)) {
             return stopThreshold.get(fileName);
         }
-        return Double.NEGATIVE_INFINITY;
+        return default_threshold;
     }
 
     private static void runSingle() {
@@ -70,7 +70,8 @@ public class App {
         problemParser.parseFile(configParser.inputFile);
 
         long start = System.currentTimeMillis();
-        Solver solver = new Solver(configParser, problemParser, getThreshold(configParser.inputFile));
+        Solver solver = new Solver(configParser, problemParser,
+                getThreshold(configParser.inputFile, configParser.stopThreshold));
         solver.runGA();
         System.out.println(
                 "Elapsed training time: " + Helper.roundDouble((System.currentTimeMillis() - start) / 1000.0) + " s");
@@ -96,7 +97,8 @@ public class App {
             problemParser.parseFile(configParser.inputFile);
 
             long start = System.currentTimeMillis();
-            Solver solver = new Solver(configParser, problemParser, getThreshold(configParser.inputFile));
+            Solver solver = new Solver(configParser, problemParser,
+                    getThreshold(configParser.inputFile, configParser.stopThreshold));
             solver.runGA();
             System.out.println("Elapsed training time: "
                     + Helper.roundDouble((System.currentTimeMillis() - start) / 1000.0) + " s");

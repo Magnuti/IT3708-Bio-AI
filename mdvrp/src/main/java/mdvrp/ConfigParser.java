@@ -13,6 +13,7 @@ public class ConfigParser {
     String inputFile;
     int populationSize;
     int maxGeneration;
+    double stopThreshold;
     double eliteRatio;
     double crossoverChance;
     double bound;
@@ -33,6 +34,7 @@ public class ConfigParser {
             this.inputFile = obj.get("input_file").toString();
             this.populationSize = (int) obj.get("population_size");
             this.maxGeneration = (int) obj.get("max_generation");
+            this.stopThreshold = (double) obj.get("stop_threshold");
             this.eliteRatio = (double) obj.get("elite_ratio");
             this.crossoverChance = (double) obj.get("crossover_chance");
             this.bound = (double) obj.get("bound");
