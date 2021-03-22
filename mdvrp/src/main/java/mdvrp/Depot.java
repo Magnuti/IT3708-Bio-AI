@@ -12,7 +12,7 @@ public class Depot {
     private int y;
     // TODO encapsulate these
     List<Customer> customers = new ArrayList<>();
-    List<Customer> swappableCustomers = new ArrayList<>();
+    List<Customer> swappableCustomers = new ArrayList<>(); // TODO make a set
     List<Route> routes = new ArrayList<>();
 
     public Depot(int maxRouteDistance, int maxVehicleLoad) {
@@ -31,7 +31,11 @@ public class Depot {
         this.maxVehicleLoad = depotToCopy.maxVehicleLoad;
         this.x = depotToCopy.x;
         this.y = depotToCopy.y;
-        this.customers = new ArrayList<>(depotToCopy.customers);
+        if (depotToCopy.customers == null) {
+            this.customers = null;
+        } else {
+            this.customers = new ArrayList<>(depotToCopy.customers);
+        }
         this.swappableCustomers = new ArrayList<>(depotToCopy.swappableCustomers);
         this.routes = new ArrayList<>();
         for (Route route : depotToCopy.routes) {
@@ -171,19 +175,23 @@ public class Depot {
         this.routes = this.routes.stream().filter(x -> !x.customers.isEmpty()).collect(Collectors.toList());
     }
 
-    public List<Customer> getCustomers() {
-        this.customers.clear();
-        for (Route route : this.routes) {
-            for (Customer customer : route.customers) {
-                this.customers.add(customer);
-            }
-        }
-        return this.customers;
+    public void pruneEmtpyRoutes() {
+        this.routes = this.routes.stream().filter(x -> x.customers.size() > 0).collect(Collectors.toList());
     }
 
-    public void rebuildCustomerList() {
-        getCustomers();
-    }
+    // public List<Customer> getCustomers() {
+    // this.customers.clear();
+    // for (Route route : this.routes) {
+    // for (Customer customer : route.customers) {
+    // this.customers.add(customer);
+    // }
+    // }
+    // return this.customers;
+    // }
+
+    // public void rebuildCustomerList() {
+    // getCustomers();
+    // }
 
     public void recalculateUsedRouteLengthAndCapacity(Route route) {
         int fromX = this.getX();
