@@ -1,7 +1,10 @@
 package mdvrp;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class Depot {
@@ -10,9 +13,10 @@ public class Depot {
     private int maxVehicleLoad;
     private int x;
     private int y;
-    // TODO encapsulate these
-    List<Customer> customers = new ArrayList<>();
-    List<Customer> swappableCustomers = new ArrayList<>(); // TODO make a set
+
+    private List<Customer> customers;
+    private Set<Customer> swappableCustomers;
+
     List<Route> routes = new ArrayList<>();
 
     public Depot(int maxRouteDistance, int maxVehicleLoad) {
@@ -23,6 +27,16 @@ public class Depot {
             this.maxRouteDistance = (double) maxRouteDistance;
         }
         this.maxVehicleLoad = maxVehicleLoad;
+        this.customers = new ArrayList<>();
+        this.swappableCustomers = new HashSet<>();
+    }
+
+    public void initDepotSecond(int id, int x, int y) {
+        // We need to split up the constructor in two parts because the problem input
+        // file has a dumb format
+        this.id = id;
+        this.x = x;
+        this.y = y;
     }
 
     public Depot(Depot depotToCopy) {
@@ -31,22 +45,18 @@ public class Depot {
         this.maxVehicleLoad = depotToCopy.maxVehicleLoad;
         this.x = depotToCopy.x;
         this.y = depotToCopy.y;
-        if (depotToCopy.customers == null) {
-            this.customers = null;
-        } else {
+        if (depotToCopy.customers != null) {
             this.customers = new ArrayList<>(depotToCopy.customers);
         }
-        this.swappableCustomers = new ArrayList<>(depotToCopy.swappableCustomers);
+        this.swappableCustomers = new HashSet<>(depotToCopy.swappableCustomers);
         this.routes = new ArrayList<>();
         for (Route route : depotToCopy.routes) {
             this.routes.add(new Route(route));
         }
     }
 
-    public void initDepotSecond(int id, int x, int y) {
-        this.id = id;
-        this.x = x;
-        this.y = y;
+    public void shuffleCustomers() {
+        Collections.shuffle(this.customers);
     }
 
     /**
@@ -122,17 +132,11 @@ public class Depot {
             return;
         }
 
-        // for (int i = 0; i < this.routes.size(); i++) {
-        // int next_i = i + 1;
-        // if (i == this.routes.size() - 1) {
-        // next_i = 0;
-        // }
-        // Route route = this.routes.get(i);
         for (int i = this.routes.size() - 2; i > -2; i--) {
             // Iterates the routes backwards. The reasoning is that the last route is
             // probably not full, so we should start by appending a possible customer to
             // that route instead of trying to fill routes that are already full as could
-            // hvae happened if we had started with the first route.
+            // have happened if we had started with the first route.
             int next_i = i + 1;
             Route route;
             if (i == -1) {
@@ -173,25 +177,14 @@ public class Depot {
 
         // Remove all routes that lost all customers
         this.routes = this.routes.stream().filter(x -> !x.customers.isEmpty()).collect(Collectors.toList());
+
+        // We do not need customers after route scheduling is done
+        this.customers = null;
     }
 
     public void pruneEmtpyRoutes() {
         this.routes = this.routes.stream().filter(x -> x.customers.size() > 0).collect(Collectors.toList());
     }
-
-    // public List<Customer> getCustomers() {
-    // this.customers.clear();
-    // for (Route route : this.routes) {
-    // for (Customer customer : route.customers) {
-    // this.customers.add(customer);
-    // }
-    // }
-    // return this.customers;
-    // }
-
-    // public void rebuildCustomerList() {
-    // getCustomers();
-    // }
 
     public void recalculateUsedRouteLengthAndCapacity(Route route) {
         int fromX = this.getX();
@@ -227,6 +220,18 @@ public class Depot {
 
     public int getMaxVehicleLoad() {
         return this.maxVehicleLoad;
+    }
+
+    public void addCustomer(Customer customer) {
+        this.customers.add(customer);
+    }
+
+    public void addSwappableCustomer(Customer customer) {
+        this.swappableCustomers.add(customer);
+    }
+
+    public Set<Customer> getSwappableCustomers() {
+        return this.swappableCustomers;
     }
 
     @Override

@@ -74,7 +74,7 @@ public class Solver extends Thread {
                     bestDepot = depot;
                 }
             }
-            bestDepot.customers.add(customer);
+            bestDepot.addCustomer(customer);
 
             double bound = this.bound;
             for (Depot depot : depots) {
@@ -82,7 +82,7 @@ public class Solver extends Thread {
                         bestDepot.getY());
                 if ((Helper.euclidianDistance(customer.getX(), customer.getY(), depot.getX(), depot.getY()) - min)
                         / min <= bound) {
-                    depot.swappableCustomers.add(customer);
+                    depot.addSwappableCustomer(customer);
                 }
             }
         }
@@ -102,7 +102,7 @@ public class Solver extends Thread {
             for (Depot depot : depots) {
                 Depot depotToAdd = new Depot(depot);
                 // Initialize random routes for each depot per chromosome
-                Collections.shuffle(depotToAdd.customers);
+                depotToAdd.shuffleCustomers();
                 depotsCopy.add(depotToAdd);
             }
             Chromosome chromosome = new Chromosome(depotsCopy);
@@ -110,11 +110,6 @@ public class Solver extends Thread {
             chromosome.routeSchedulingSecondPart();
             chromosome.getLegality(this.maxVehicesPerDepot);
             chromosome.updateFitnessByTotalDistanceWithPenalty(0);
-
-            // ! Hotfix
-            for (Depot depot : chromosome.depots) {
-                depot.customers = null;
-            }
 
             this.population.add(chromosome);
         }
@@ -320,15 +315,6 @@ public class Solver extends Thread {
             // ? parallellize these
             crossoverInsertCustomers(customers1, depot2);
             crossoverInsertCustomers(customers2, depot1);
-
-            // for (Depot depot : offspring1.depots) {
-            // depot.rebuildCustomerList();
-            // }
-
-            // for (Depot depot : offspring2.depots) {
-            // depot.rebuildCustomerList();
-            // }
-
         }
         // If not crossover, we return a copy of the parents without modifications
         Chromosome[] offsprings = { offspring1, offspring2 };
@@ -424,26 +410,26 @@ public class Solver extends Thread {
             return;
         }
         List<Depot> depotsWithSwappableCustomers = chromosome.depots.stream()
-                .filter(x -> x.swappableCustomers.size() > 0).collect(Collectors.toList());
-        List<Depot> toRemove = new ArrayList<>();
+                .filter(x -> x.getSwappableCustomers().size() > 0).collect(Collectors.toList());
+        List<Depot> fullDepots = new ArrayList<>();
         for (Depot depot : depotsWithSwappableCustomers) {
             List<Customer> customersInDepot = new ArrayList<>();
-            // Already full depot, in the sense that it already have all customers it can
-            // have
             for (Route route : depot.routes) {
                 customersInDepot.addAll(route.customers);
             }
-            if (new HashSet<>(customersInDepot).containsAll(new HashSet<>(depot.swappableCustomers))) {
-                toRemove.add(depot);
+            if (new HashSet<>(customersInDepot).containsAll(depot.getSwappableCustomers())) {
+                // Already full depot, in the sense that it already has all customers it can
+                // have
+                fullDepots.add(depot);
             }
         }
-        depotsWithSwappableCustomers.removeAll(toRemove);
+        depotsWithSwappableCustomers.removeAll(fullDepots);
         if (depotsWithSwappableCustomers.isEmpty()) {
             return;
         }
 
         Depot toDepot = Helper.getRandomElementFromList(depotsWithSwappableCustomers);
-        HashSet<Customer> possibleCustomersToGet = new HashSet<>(toDepot.swappableCustomers);
+        HashSet<Customer> possibleCustomersToGet = new HashSet<>(toDepot.getSwappableCustomers());
         List<Customer> customersInDepot = new ArrayList<>();
         for (Route route : toDepot.routes) {
             customersInDepot.addAll(route.customers);

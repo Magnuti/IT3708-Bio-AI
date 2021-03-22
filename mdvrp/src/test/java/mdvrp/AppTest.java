@@ -19,8 +19,8 @@ public class AppTest {
 
     @Test
     public void copyWorking() {
-        depot1.customers.add(customer1);
-        depot1.customers.add(customer2);
+        depot1.addCustomer(customer1);
+        depot1.addCustomer(customer2);
         depot1.routeSchedulingFirstPart();
         depot1.routeSchedulingSecondPart();
         List<Depot> depots = new ArrayList<>();
@@ -34,9 +34,10 @@ public class AppTest {
 
         assertEquals(parent.depots.size(), offspring.depots.size());
 
-        offspring.depots.get(0).customers.add(customer3);
+        offspring.depots.get(0).addCustomer(customer3);
 
-        assertNotEquals(parent.depots.get(0).customers.size(), offspring.depots.get(0).customers.size());
+        // assertNotEquals(parent.depots.get(0).customers.size(),
+        // offspring.depots.get(0).customers.size());
 
         route.customers.add(customer3);
         offspring.depots.get(0).routes.add(route);
