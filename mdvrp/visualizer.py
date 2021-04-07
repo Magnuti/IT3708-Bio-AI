@@ -112,6 +112,7 @@ def plot_depots_and_customer():
 
 
 if path.exists("test_solutions/{}.res".format(input_file)):
+    # Plot the test solution next to our solution if it exists
     plt.figure(figsize=(16, 8))
 
     plt.subplot(1, 2, 1)
@@ -123,6 +124,7 @@ if path.exists("test_solutions/{}.res".format(input_file)):
     plot_solution("test_solutions/{}.res".format(input_file),
                   "Test solution")
 else:
+    # Plot only our solution if no test solution exists
     plt.figure(figsize=(8, 8))
     plot_depots_and_customer()
     plot_solution("solutions/solution.res", "Solution")
