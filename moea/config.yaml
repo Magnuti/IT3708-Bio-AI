@@ -1,0 +1,17 @@
+image_directory: 86016
+
+population_size: 50
+max_generation: 100
+
+# Stop the genetic algorithm when if we reach this fitness
+stop_threshold: 0.0
+
+crossover_probability: 0.7
+
+# The probability of applying mutation
+mutation_rate: 0.2
+
+verbose: true
+
+# How often to save the best found solution to a file
+save_interval: 5000
