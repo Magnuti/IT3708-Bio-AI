@@ -12,6 +12,12 @@ import javax.imageio.ImageIO;
  *
  */
 public class App {
+
+    // Note that the order matters
+    public enum PixelDirections {
+        NONE, RIGHT, LEFT, UP, DOWN, TOP_RIGHT, BOTTOM_RIGHT, TOP_LEFT, BOTTOM_LEFT
+    }
+
     public static void main(String[] args) {
         ConfigParser configParser = new ConfigParser();
         configParser.parseConfig();
