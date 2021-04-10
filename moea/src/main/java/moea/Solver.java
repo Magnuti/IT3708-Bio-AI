@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.awt.Color;
 
@@ -26,6 +24,8 @@ public class Solver {
     public Solver(ConfigParser configParser, BufferedImage image) {
         this.image = image;
         this.N = image.getHeight() * image.getWidth();
+
+        // The population consists of several chromosomes
         this.population = new PixelDirection[configParser.populationSize][N];
 
         this.neighborArrays = constructNeighborArray();
@@ -35,7 +35,18 @@ public class Solver {
         // mst.primMST(232);
         initRandomPopulation(configParser.populationSize);
 
-        genotypeToPhenotype();
+        // TODO multi-thread
+        for (int i = 0; i < this.population.length; i++) {
+            System.out.println("Chromosome: " + i);
+            int[] indexToSegmentIds = genotypeToPhenotype(this.population[i]);
+            double edgeValue = edgeValue(indexToSegmentIds);
+            System.out.println("Edge value: " + edgeValue);
+            double connectivityMeasure = connectivityMeasure(indexToSegmentIds);
+            System.out.println("Connectivity measure: " + connectivityMeasure);
+            double overallDeviation = overallDeviation(indexToSegmentIds);
+            System.out.println("Overall deviation: " + overallDeviation);
+            System.out.println();
+        }
     }
 
     void initRandomPopulation(int populationSize) {
@@ -47,36 +58,34 @@ public class Solver {
         }
     }
 
-    List<List<Set<Integer>>> genotypeToPhenotype() {
-        // A list of segments for each individual in th population
-        List<List<Set<Integer>>> segmentsPerPopulation = new ArrayList<>();
-        for (int population = 0; population < this.population.length; population++) {
-            DisjointSets disjointSets = new DisjointSets(this.N);
-            for (int pixelIndex = 0; pixelIndex < this.N; pixelIndex++) {
-                int neighborDirectionIndex = this.population[population][pixelIndex].ordinal();
-                int neighborIndex = this.neighborArrays[pixelIndex][neighborDirectionIndex];
-                if (neighborIndex == -1 || neighborIndex == pixelIndex) {
-                    continue;
-                }
-                disjointSets.union(pixelIndex, neighborIndex);
+    int[] genotypeToPhenotype(PixelDirection[] chromosome) {
+        int[] indexToSegmentIds = new int[chromosome.length];
+        DisjointSets disjointSets = new DisjointSets(this.N);
+        for (int pixelIndex = 0; pixelIndex < this.N; pixelIndex++) {
+            int neighborDirectionIndex = chromosome[pixelIndex].ordinal();
+            int neighborIndex = this.neighborArrays[pixelIndex][neighborDirectionIndex];
+            if (neighborIndex == -1 || neighborIndex == pixelIndex) {
+                continue;
             }
-
-            Map<Integer, Set<Integer>> m = new HashMap<>();
-            for (int j = 0; j < this.N; j++) {
-                int parent = disjointSets.find(j);
-                if (m.containsKey(parent)) {
-                    m.get(parent).add(j);
-                } else {
-                    Set<Integer> set = new HashSet<>();
-                    set.add(parent);
-                    set.add(j); // If the parent is itself the set handles this
-                    m.put(parent, set);
-                }
-            }
+            disjointSets.union(pixelIndex, neighborIndex);
         }
-        return segmentsPerPopulation;
+
+        // Let each pixel point to its representative, this way all indices pointing to
+        // the same number is in the same segment
+        for (int i = 0; i < this.N; i++) {
+            indexToSegmentIds[i] = disjointSets.find(i);
+        }
+
+        return indexToSegmentIds;
     }
 
+    /**
+     * Constructs a 2D array where the inner array corresponds to the neighbor given
+     * by PixelDirection. So, [2][3] gives us the index of the pixel 2's upper
+     * neighbor.
+     * 
+     * @return
+     */
     int[][] constructNeighborArray() {
         int[][] neighborArrays = new int[this.N][PixelDirection.values().length];
         for (int i = 0; i < this.N; i++) {
@@ -170,33 +179,118 @@ public class Solver {
 
     }
 
-    double getEdgeValue() {
+    double edgeValue(int[] indexToSegmentIds) {
+        // We want to maximize this
         double edgeValue = 0.0;
         for (int i = 0; i < this.N; i++) {
             // Loop the neighbor pixels of pixel i
             // if j is not in the same segment then add a number from equation 2
             // edgeValue += getRgbDistance(...)
+            for (int j = 1; i < this.neighborArrays[0].length; i++) {
+                // Skip the first neighbor index since it points to itself
+                int neighborIndex = this.neighborArrays[i][j];
+                if (neighborIndex != -1) {
+                    if (indexToSegmentIds[i] != indexToSegmentIds[neighborIndex]) {
+                        edgeValue += getRgbDistance(getRgbFromIndex(i), getRgbFromIndex(neighborIndex));
+                    }
+                }
+            }
         }
         return edgeValue;
     }
 
-    double getConnectivityMeasure() {
+    double connectivityMeasure(int[] indexToSegmentIds) {
+        // We want to minimize this
         double connectivity = 0.0;
         for (int i = 0; i < this.N; i++) {
             // Loop the neighbor pixels of pixel i
             // if j is not in the same segment then add a number from equation 4
             // connectivity += 1/8
-            // ? 1/8 or 1/F(j) here? ask about this
+            // TODO ask about this
+            // ? 1/8 or 1/F(j) here?
+            for (int j = 1; i < this.neighborArrays[0].length; i++) {
+                // Skip the first neighbor index since it points to itself
+                int neighborIndex = this.neighborArrays[i][j];
+                if (neighborIndex != -1) {
+                    if (indexToSegmentIds[i] != indexToSegmentIds[neighborIndex]) {
+                        connectivity += 1 / j;
+                    }
+                }
+            }
         }
         return connectivity;
     }
 
-    double getOverallDeviation() {
+    double overallDeviation(int[] indexToSegmentIds) {
+        // We want to minimize this
+
+        // Calculates centroid for each segment
+        Map<Integer, List<Integer>> segmentSumsR = new HashMap<>();
+        Map<Integer, List<Integer>> segmentSumsG = new HashMap<>();
+        Map<Integer, List<Integer>> segmentSumsB = new HashMap<>();
+        for (int i = 0; i < indexToSegmentIds.length; i++) {
+            int segmentId = indexToSegmentIds[i];
+            int rgb = getRgbFromIndex(i);
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8) & 0xFF;
+            int b = (rgb >> 0) & 0xFF;
+            if (segmentSumsR.containsKey(segmentId)) {
+                segmentSumsR.get(segmentId).add(r);
+                segmentSumsG.get(segmentId).add(g);
+                segmentSumsB.get(segmentId).add(b);
+            } else {
+                List<Integer> valuesR = new ArrayList<>();
+                List<Integer> valuesG = new ArrayList<>();
+                List<Integer> valuesB = new ArrayList<>();
+                valuesR.add(r);
+                valuesG.add(g);
+                valuesB.add(b);
+                segmentSumsR.put(segmentId, valuesR);
+                segmentSumsG.put(segmentId, valuesG);
+                segmentSumsB.put(segmentId, valuesB);
+            }
+        }
+
+        Map<Integer, Integer> segmentCentroidsR = new HashMap<>();
+        Map<Integer, Integer> segmentCentroidsG = new HashMap<>();
+        Map<Integer, Integer> segmentCentroidsB = new HashMap<>();
+        for (Integer key : segmentSumsR.keySet()) {
+            int sumR = segmentSumsR.get(key).stream().reduce(0, Integer::sum);
+            int sumG = segmentSumsG.get(key).stream().reduce(0, Integer::sum);
+            int sumB = segmentSumsB.get(key).stream().reduce(0, Integer::sum);
+            int averageR = sumR / segmentSumsR.get(key).size();
+            int averageG = sumG / segmentSumsG.get(key).size();
+            int averageB = sumB / segmentSumsB.get(key).size();
+            segmentCentroidsR.put(key, averageR);
+            segmentCentroidsG.put(key, averageG);
+            segmentCentroidsB.put(key, averageB);
+        }
+
+        Map<Integer, Integer> segmentCentroids = new HashMap<>();
+        for (Integer key : segmentSumsR.keySet()) {
+            int rgb = segmentCentroidsR.get(key);
+            rgb = (rgb << 8) + segmentCentroidsG.get(key);
+            rgb = (rgb << 8) + segmentCentroidsB.get(key);
+            segmentCentroids.put(key, rgb);
+        }
+
         double deviation = 0.0;
-        // loop all segment_sets
-        // loop all pixels in that segment_set
-        // deviation += getRgbDistance(i, centroid_of_the_current_segment_set)
+        // Loop all segment_sets
+        for (Integer key : segmentCentroids.keySet()) {
+            // Loop all pixels in that segment_set
+            for (int i = 0; i < indexToSegmentIds.length; i++) {
+                if (indexToSegmentIds[i] == key) {
+                    deviation += getRgbDistance(getRgbFromIndex(i), segmentCentroids.get(key));
+                }
+            }
+        }
         return deviation;
+    }
+
+    int getRgbFromIndex(int index) {
+        int y = index / this.image.getWidth();
+        int x = index % this.image.getWidth();
+        return this.image.getRGB(x, y);
     }
 
     double getRgbDistance(int rgb1, int rgb2) {
