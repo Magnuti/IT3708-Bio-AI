@@ -14,7 +14,7 @@ import javax.imageio.ImageIO;
 public class App {
 
     // Note that the order matters
-    public enum PixelDirections {
+    public enum PixelDirection {
         NONE, RIGHT, LEFT, UP, DOWN, TOP_RIGHT, BOTTOM_RIGHT, TOP_LEFT, BOTTOM_LEFT
     }
 
@@ -24,7 +24,7 @@ public class App {
 
         BufferedImage image = openImage(configParser.imageDirectory);
 
-        Solver solver = new Solver(image);
+        Solver solver = new Solver(configParser, image);
     }
 
     static BufferedImage openImage(String image_directory) {
