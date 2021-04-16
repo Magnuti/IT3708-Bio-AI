@@ -28,6 +28,13 @@ public class ConfigParser {
 
             this.imageDirectory = obj.get("image_directory").toString();
             this.populationSize = (int) obj.get("population_size");
+            if (this.populationSize % 2 == 1) {
+                System.out.println(
+                        "Warning: Please keep the population size as an even number. Why? Because two parents can reproduce easily, while three is more difficult.");
+                this.populationSize--;
+                System.out.println("Using a population size of: " + populationSize);
+            }
+
             this.maxGeneration = (int) obj.get("max_generation");
             this.stopThreshold = (double) obj.get("stop_threshold");
             this.crossoverProbability = (double) obj.get("crossover_probability");
