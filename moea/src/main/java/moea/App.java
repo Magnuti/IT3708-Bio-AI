@@ -25,6 +25,7 @@ public class App {
         BufferedImage image = openImage(configParser.imageDirectory);
 
         Solver solver = new Solver(configParser, image);
+        solver.runGA();
     }
 
     static BufferedImage openImage(String image_directory) {
