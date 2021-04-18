@@ -2,8 +2,6 @@ package moea;
 
 // https://www.geeksforgeeks.org/disjoint-set-data-structures/
 
-// TODO see if we can optimize the disjoint set with path compression or union-by-rank
-
 public class DisjointSets {
     int[] rank, parent;
     int n;
@@ -22,9 +20,15 @@ public class DisjointSets {
     }
 
     // Returns representative of x's set
+    // This method also updates x's parent (path compression)
     int find(int x) {
+        // Finds the representative of the set that x is an element of
         if (parent[x] != x) {
+            // If x is not the parent of itself, then x is not the representative of its
+            // set,
             parent[x] = find(parent[x]);
+            // so we recursively call find() on its parent and move x's node directly under
+            // the representative of this set.
         }
 
         return parent[x];
