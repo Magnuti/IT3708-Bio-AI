@@ -1,14 +1,29 @@
 package moea;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Set;
 
 import moea.App.PixelDirection;
 
 public class MST {
+    class Pixel implements Comparable<Pixel> {
+        final int index;
+        Pixel parent;
+        double key;
+
+        Pixel(int index) {
+            this.index = index;
+            this.key = Double.POSITIVE_INFINITY;
+        }
+
+        @Override
+        public int compareTo(Pixel other) {
+            return Double.compare(this.key, other.key);
+        }
+    }
+
     final double[][] edgeValues;
     final int[][] neighborArrays;
     final int V;
@@ -24,43 +39,44 @@ public class MST {
         this.V = edgeValues.length;
     }
 
-    private int[] primMST(int startingNode) {
-        int parents[] = new int[V];
-        double keys[] = new double[V];
-
-        List<Integer> visitedNodes = new ArrayList<>();
-        Set<Integer> unvisitedNodes = new HashSet<>();
-        for (int i = 0; i < V; i++) {
-            keys[i] = Double.POSITIVE_INFINITY;
-            unvisitedNodes.add(i);
+    private Pixel[] primMST(int startingNode) {
+        Pixel[] pixels = new Pixel[this.V];
+        for (int i = 0; i < this.V; i++) {
+            pixels[i] = new Pixel(i);
         }
 
-        keys[startingNode] = 0.0;
-        parents[startingNode] = -1;
+        Set<Pixel> visitedNodes = new HashSet<>();
+        // TODO find out if we can use a Fibonacci heap here istead, as the removing
+        // TODO and re-insertion is pretty expensive on the heap which PriorityQueue
+        // TODO uses.
+        PriorityQueue<Pixel> unvisitedNodes = new PriorityQueue<>(Arrays.asList(pixels));
+
+        pixels[startingNode].key = 0.0;
+        // We need to remove and re-insert to update the PriorityQueue
+        unvisitedNodes.remove(pixels[startingNode]);
+        unvisitedNodes.add(pixels[startingNode]);
 
         while (!unvisitedNodes.isEmpty()) {
-            // Extract min node from the graph of unvisited nodes
-            // Note that we should this EXTRACT_MIN function more efficienly if we are to
-            // optimize the code. Maybe with a binary heap or a Fibonacci heap.
-            int nextNode = -1;
-            double min = Double.POSITIVE_INFINITY;
-            for (Integer i : unvisitedNodes) {
-                if (keys[i] < min) {
-                    min = keys[i];
-                    nextNode = i;
-                }
-            }
-
+            Pixel nextNode = unvisitedNodes.remove();
             visitedNodes.add(nextNode);
-            unvisitedNodes.remove(nextNode);
 
-            for (int n = 0; n < this.neighborArrays[nextNode].length; n++) {
-                int neighborNode = this.neighborArrays[nextNode][n];
-                if (unvisitedNodes.contains(neighborNode)) {
-                    double edgeWeight = edgeValues[nextNode][n];
-                    if (edgeWeight < keys[neighborNode]) {
-                        parents[neighborNode] = nextNode;
-                        keys[neighborNode] = edgeWeight;
+            for (int n = 0; n < this.neighborArrays[nextNode.index].length; n++) {
+                int neighborNodeIndex = this.neighborArrays[nextNode.index][n];
+                if (neighborNodeIndex == -1) {
+                    continue;
+                }
+                Pixel neighborNode = pixels[neighborNodeIndex];
+                // We use a set here because .contains is O(1) on sets, which results in a
+                // massive speedup
+                if (!visitedNodes.contains(neighborNode)) {
+                    double edgeWeight = edgeValues[nextNode.index][n];
+                    if (edgeWeight < neighborNode.key) {
+                        neighborNode.parent = nextNode;
+                        neighborNode.key = edgeWeight;
+
+                        // We need to remove and re-insert to update the PriorityQueue
+                        unvisitedNodes.remove(neighborNode);
+                        unvisitedNodes.add(neighborNode);
                     }
                 }
             }
@@ -77,25 +93,33 @@ public class MST {
         // edgeValues.get(fromIndex).get(toIndex));
         // }
         // }
-        return parents;
+        // return parents;
+        return pixels;
     }
 
     PixelDirection[] findDirections(int startingNode) {
-        int[] parents = primMST(startingNode);
+        Pixel[] pixels = primMST(startingNode);
 
         PixelDirection[] directions = new PixelDirection[this.V];
-        for (int i = 0; i < parents.length; i++) {
-            int parentNode = parents[i];
+        for (int i = 0; i < pixels.length; i++) {
+            Pixel parentNode = pixels[i].parent;
+            if (parentNode == null) {
+                // Happens for the starting node
+                directions[i] = PixelDirection.NONE;
+                continue;
+            }
 
             // Dumb find index method, fix later
-            int x = -1;
+            int directionIndex = -1;
             for (int k = 0; k < this.neighborArrays[i].length; k++) {
-                if (this.neighborArrays[i][k] == parentNode) {
-                    x = k;
+                if (this.neighborArrays[i][k] == parentNode.index) {
+                    directionIndex = k;
+                    break;
                 }
             }
-            // int x = Arrays.asList(this.neighborArrays[i]).indexOf(parentNode);
-            directions[i] = PixelDirection.values()[x];
+
+            // Make it such that each pixel points to its parent
+            directions[i] = PixelDirection.values()[directionIndex];
         }
         return directions;
     }

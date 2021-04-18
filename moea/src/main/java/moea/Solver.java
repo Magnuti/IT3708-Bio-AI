@@ -20,13 +20,13 @@ import moea.App.PixelDirection;
 
 public class Solver {
 
-    private BufferedImage image;
-    private int N; // Number of pixels in the image
-    private int maxGeneration;
-    List<Map<Integer, Double>> edgeValues = new ArrayList<>();
+    final private BufferedImage image;
+    final private int N; // Number of pixels in the image
+    final private int maxGeneration;
+    final private double[][] edgeValues;
 
     // TODO maybe create a Pixel class which holds the x, y, RGB and segment ID ?
-    private int[][] neighborArrays;
+    final private int[][] neighborArrays;
     List<Chromosome> population;
 
     public Solver(ConfigParser configParser, BufferedImage image) {
@@ -40,9 +40,9 @@ public class Solver {
         this.neighborArrays = constructNeighborArray();
         this.edgeValues = constructEdgeValues();
 
-        // MST mst = new MST(edgeValues);
-        // mst.primMST(232);
-        initRandomPopulation(configParser.populationSize);
+        MST mst = new MST(edgeValues, neighborArrays);
+        initPopulationByMinimumSpanningTree(configParser.populationSize, mst);
+        // initRandomPopulation(configParser.populationSize);
 
         // TODO multi-thread
         for (int i = 0; i < this.population.size(); i++) {
@@ -74,22 +74,22 @@ public class Solver {
             // }
 
             Map<Integer, Color> colors = new HashMap<>();
-            for (int j = 0; j < chromosome.indexToSegmentIds.length; j++) {
-                if (!colors.containsKey(chromosome.indexToSegmentIds[j])) {
+            for (int p = 0; p < chromosome.indexToSegmentIds.length; p++) {
+                if (!colors.containsKey(chromosome.indexToSegmentIds[p])) {
                     float r = ThreadLocalRandom.current().nextFloat();
                     float g = ThreadLocalRandom.current().nextFloat();
                     float b = ThreadLocalRandom.current().nextFloat();
-                    colors.put(chromosome.indexToSegmentIds[j], new Color(r, g, b));
+                    colors.put(chromosome.indexToSegmentIds[p], new Color(r, g, b));
                 }
             }
 
             System.out.println("Segments " + colors.keySet().size());
             System.out.println();
 
-            for (int pixel = 0; pixel < this.N; pixel++) {
-                int y = pixel / this.image.getWidth();
-                int x = pixel % this.image.getWidth();
-                bufferedImage.setRGB(x, y, colors.get(chromosome.indexToSegmentIds[pixel]).getRGB());
+            for (int p = 0; p < this.N; p++) {
+                int y = p / this.image.getWidth();
+                int x = p % this.image.getWidth();
+                bufferedImage.setRGB(x, y, colors.get(chromosome.indexToSegmentIds[p]).getRGB());
             }
 
             // for (int pixel = 0; pixel < this.N; pixel++) {
@@ -126,6 +126,16 @@ public class Solver {
         }
     }
 
+    void initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
+        for (int i = 0; i < populationSize; i++) {
+            System.out.println("Init poopulation for chromosome: " + i);
+            int startingNode = ThreadLocalRandom.current().nextInt(this.N);
+            PixelDirection[] pixelDirections = mst.findDirections(startingNode);
+            Chromosome chromosome = new Chromosome(pixelDirections);
+            this.population.add(chromosome);
+        }
+    }
+
     void initRandomPopulation(int populationSize) {
         for (int i = 0; i < populationSize; i++) {
             PixelDirection[] pixelDirections = new PixelDirection[this.N];
@@ -148,13 +158,13 @@ public class Solver {
     int[] genotypeToPhenotype(Chromosome chromosome) {
         int[] indexToSegmentIds = new int[this.N];
         DisjointSets disjointSets = new DisjointSets(this.N);
-        for (int pixelIndex = 0; pixelIndex < this.N; pixelIndex++) {
-            int neighborDirectionIndex = chromosome.pixelDirections[pixelIndex].ordinal();
-            int neighborIndex = this.neighborArrays[pixelIndex][neighborDirectionIndex];
-            if (neighborIndex == -1 || neighborIndex == pixelIndex) {
+        for (int i = 0; i < this.N; i++) {
+            PixelDirection pixelDirection = chromosome.pixelDirections[i];
+            int neighborIndex = this.neighborArrays[i][pixelDirection.ordinal()];
+            if (neighborIndex == -1 || neighborIndex == i) {
                 continue;
             }
-            disjointSets.union(pixelIndex, neighborIndex);
+            disjointSets.union(i, neighborIndex);
         }
 
         // Let each pixel point to its representative, this way all indices pointing to
@@ -228,35 +238,65 @@ public class Solver {
         return neighborArrays;
     }
 
-    List<Map<Integer, Double>> constructEdgeValues() {
-        List<Map<Integer, Double>> edgeValues = new ArrayList<>();
+    /**
+     * Returns a 2D array which holds the edge value between two pixels. [0][2]
+     * gives us the edge value (RGB distance) between pixel 0 and the left pixel of
+     * pixel 0 according to PixelDirection.
+     * 
+     * @return
+     */
+    double[][] constructEdgeValues() {
+        double[][] edgeValues = new double[this.N][PixelDirection.values().length];
+        for (int i = 0; i < this.N; i++) {
+            Arrays.fill(edgeValues[i], Double.POSITIVE_INFINITY);
+        }
+
         for (int h = 0; h < this.image.getHeight(); h++) {
             for (int w = 0; w < this.image.getWidth(); w++) {
-                Map<Integer, Double> values = new HashMap<>();
-
                 int i = h * this.image.getWidth() + w;
 
                 int indexRgb = this.image.getRGB(w, h);
 
-                if (w > 0) {
-                    int leftNeighbor = i - 1;
-                    values.put(leftNeighbor, getRgbDistance(indexRgb, this.image.getRGB(w - 1, h)));
-                }
+                // Right neighbor
                 if (w < this.image.getWidth() - 1) {
-                    int rightNeighbor = i + 1;
-                    values.put(rightNeighbor, getRgbDistance(indexRgb, this.image.getRGB(w + 1, h)));
+                    edgeValues[i][1] = getRgbDistance(indexRgb, this.image.getRGB(w + 1, h));
                 }
 
+                // Left neighbor
+                if (w > 0) {
+                    edgeValues[i][2] = getRgbDistance(indexRgb, this.image.getRGB(w - 1, h));
+                }
+
+                // Top neighbor
                 if (h > 0) {
-                    int topNeighbor = i - this.image.getWidth();
-                    values.put(topNeighbor, getRgbDistance(indexRgb, this.image.getRGB(w, h - 1)));
+                    edgeValues[i][3] = getRgbDistance(indexRgb, this.image.getRGB(w, h - 1));
+
+                    // Top-right neighbor
+                    if (w < this.image.getWidth() - 1) {
+                        edgeValues[i][5] = getRgbDistance(indexRgb, this.image.getRGB(w + 1, h - 1));
+                    }
+
+                    // Top-left neighbor
+                    if (w > 0) {
+                        edgeValues[i][7] = getRgbDistance(indexRgb, this.image.getRGB(w - 1, h - 1));
+                    }
                 }
 
+                // Bottom neighbor
                 if (h < this.image.getHeight() - 1) {
-                    int bottomNeighbor = i + this.image.getWidth();
-                    values.put(bottomNeighbor, getRgbDistance(indexRgb, this.image.getRGB(w, h + 1)));
+                    edgeValues[i][4] = getRgbDistance(indexRgb, this.image.getRGB(w, h + 1));
+
+                    // Bottom-right neighbor
+                    if (w < this.image.getWidth() - 1) {
+                        edgeValues[i][6] = getRgbDistance(indexRgb, this.image.getRGB(w + 1, h + 1));
+                    }
+
+                    // Bottom-left neighbor
+                    if (w > 0) {
+                        edgeValues[i][8] = getRgbDistance(indexRgb, this.image.getRGB(w - 1, h + 1));
+                    }
                 }
-                edgeValues.add(values);
+
             }
         }
         return edgeValues;
@@ -270,7 +310,7 @@ public class Solver {
         // We want to maximize edgeValue and minimize the two others, so we need to
         // reverse it.
         // TODO adjust the weighting parameters
-        return -1.0 * edgeValue + 1.0 * connectivityMeasure + 1.0 * overallDeviation;
+        return -1.0 * edgeValue + 1.0 * connectivityMeasure + 0.001 * overallDeviation;
     }
 
     double edgeValue(int[] indexToSegmentIds) {
