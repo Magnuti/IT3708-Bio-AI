@@ -22,9 +22,18 @@ public class Solver {
 
     final private BufferedImage image;
     final private int N; // Number of pixels in the image
-    final private int maxGeneration;
-    final private double[][] edgeValues;
 
+    // Config arguments
+    final private int maxGeneration;
+    final private double stopThreshold;
+    final private double crossoverProbability;
+    final private double mutationProbability;
+    final private int tournamentSize;
+    final private int sgaElitismCount;
+    final private boolean verbose;
+    final private int saveInterval;
+
+    final private double[][] edgeValues;
     // TODO maybe create a Pixel class which holds the x, y, RGB and segment ID ?
     final private int[][] neighborArrays;
     List<Chromosome> population;
@@ -33,6 +42,13 @@ public class Solver {
         this.image = image;
         this.N = image.getHeight() * image.getWidth();
         this.maxGeneration = configParser.maxGeneration;
+        this.stopThreshold = configParser.stopThreshold;
+        this.crossoverProbability = configParser.crossoverProbability;
+        this.mutationProbability = configParser.mutationProbability;
+        this.tournamentSize = configParser.tournamentSize;
+        this.sgaElitismCount = configParser.sgaElitismCount;
+        this.verbose = configParser.verbose;
+        this.saveInterval = configParser.saveInterval;
 
         // The population consists of several chromosomes
         this.population = new ArrayList<>();
@@ -82,6 +98,7 @@ public class Solver {
                     colors.put(chromosome.indexToSegmentIds[p], new Color(r, g, b));
                 }
             }
+            // TODO create both type 1 and ype
 
             System.out.println("Segments " + colors.keySet().size());
             System.out.println();
@@ -91,6 +108,9 @@ public class Solver {
                 int x = p % this.image.getWidth();
                 bufferedImage.setRGB(x, y, colors.get(chromosome.indexToSegmentIds[p]).getRGB());
             }
+
+            // TODO add black borders around the image. Just set the pixel to black if it
+            // TODO has a -1 neighbor.
 
             // for (int pixel = 0; pixel < this.N; pixel++) {
             // for (int neighborIndex = 1; neighborIndex <
@@ -302,19 +322,14 @@ public class Solver {
         return edgeValues;
     }
 
-    void nonDominatedSortingGeneticAlgorithm2() {
-
-    }
-
     double weightedSumFitness(double edgeValue, double connectivityMeasure, double overallDeviation) {
-        // We want to maximize edgeValue and minimize the two others, so we need to
-        // reverse it.
         // TODO adjust the weighting parameters
-        return -1.0 * edgeValue + 1.0 * connectivityMeasure + 0.001 * overallDeviation;
+        return 1.0 * edgeValue + 1.0 * connectivityMeasure + 0.001 * overallDeviation;
     }
 
     double edgeValue(int[] indexToSegmentIds) {
-        // We want to maximize this
+        // Normally we want to maximize this, but since the other two objectives are to
+        // be minimized we should also minimize this. So, we use -= instead of +=.
         double edgeValue = 0.0;
         for (int i = 0; i < this.N; i++) {
             // Loop the neighbor pixels of pixel i
@@ -325,7 +340,7 @@ public class Solver {
                 int neighborIndex = this.neighborArrays[i][j];
                 if (neighborIndex != -1) {
                     if (indexToSegmentIds[i] != indexToSegmentIds[neighborIndex]) {
-                        edgeValue += getRgbDistance(getRgbFromIndex(i), getRgbFromIndex(neighborIndex));
+                        edgeValue -= getRgbDistance(getRgbFromIndex(i), getRgbFromIndex(neighborIndex));
                     }
                 }
             }
@@ -340,14 +355,12 @@ public class Solver {
             // Loop the neighbor pixels of pixel i
             // if j is not in the same segment then add a number from equation 4
             // connectivity += 1/8
-            // TODO ask about this
-            // ? 1/8 or 1/F(j) here?
             for (int j = 1; i < this.neighborArrays[0].length; i++) {
                 // Skip the first neighbor index since it points to itself
                 int neighborIndex = this.neighborArrays[i][j];
                 if (neighborIndex != -1) {
                     if (indexToSegmentIds[i] != indexToSegmentIds[neighborIndex]) {
-                        connectivity += 1 / j;
+                        connectivity += (1 / 8);
                     }
                 }
             }
@@ -438,24 +451,18 @@ public class Solver {
 
     Chromosome[] tournamentSelection(int selection_size) {
         Chromosome[] winners = new Chromosome[selection_size];
-        // TODO take 4 as tournament size param
-        int tournamentSize = 4; // How many we compare
         for (int i = 0; i < selection_size; i++) {
             // selection_size number of tournaments
-            List<Chromosome> tournamentSet = new ArrayList<>(tournamentSize);
-            for (int j = 0; j < tournamentSize; j++) {
+            List<Chromosome> tournamentSet = new ArrayList<>(this.tournamentSize);
+            for (int j = 0; j < this.tournamentSize; j++) {
                 // ? Duplicates allowed in the tournamentSet now, should this be allowed?
                 tournamentSet.add(Helper.getRandomElementFromList(this.population));
             }
 
-            // TODO take 0.8 as tournamentSelectionNumber from config
-            if (ThreadLocalRandom.current().nextDouble() < 0.8) {
-                tournamentSet.sort(Comparator.comparing(c -> c.fitness));
-                winners[i] = tournamentSet.get(0);
-            } else {
-                // Add random parent
-                winners[i] = Helper.getRandomElementFromList(tournamentSet);
-            }
+            // Select the best parent without any chance to select a random winner. This
+            // differs from the MDVRP project.
+            tournamentSet.sort(Comparator.comparing(c -> c.fitness));
+            winners[i] = tournamentSet.get(0);
         }
         return winners;
     }
@@ -465,8 +472,7 @@ public class Solver {
         Chromosome offspring2 = new Chromosome(parent2);
 
         // If not crossover, we return a copy of the parents without modifications
-        // TODO take crossoverChance as config
-        if (ThreadLocalRandom.current().nextDouble() < 0.7) {
+        if (ThreadLocalRandom.current().nextDouble() < this.crossoverProbability) {
             // Make a random crossover point between [1, this.N) and not [0, this.N)
             // because we want genes from both parents.
             int crossoverPoint = ThreadLocalRandom.current().nextInt(1, this.N);
@@ -483,18 +489,14 @@ public class Solver {
     }
 
     /**
-     * Adds a 1-element mutation at a random index in the chromosome.
+     * Sets a random value at one random index in the chromosome.
      * 
      * @param chromosome
      */
     void mutation(Chromosome chromosome) {
-        for (int i = 0; i < chromosome.pixelDirections.length; i++) {
-            // TODO mutation rate config param
-            // ? Should we use bitwise mutation or only one mutated element in the array
-            // ? as per the paper?
-            if (ThreadLocalRandom.current().nextDouble() < 0.01) {
-                chromosome.pixelDirections[i] = Helper.getRandomElementFromList(PixelDirection.values());
-            }
+        if (ThreadLocalRandom.current().nextDouble() < this.mutationProbability) {
+            int i = ThreadLocalRandom.current().nextInt(chromosome.pixelDirections.length);
+            chromosome.pixelDirections[i] = Helper.getRandomElementFromList(PixelDirection.values());
         }
     }
 
@@ -508,7 +510,74 @@ public class Solver {
         }
     }
 
-    public void runGA() {
+    /**
+     * Return the winner of the crowding tournament. The winner is the one with the
+     * best/lowest rank or the one with the best/highest crowding distance if they
+     * have equal rank. Returns a random element if both are equal.
+     */
+    private Chromosome crowdingTournamentSelection(Chromosome c1, Chromosome c2, int rank1, int rank2,
+            double crowdingDistance1, double crowdingDistance2) {
+        if (rank1 < rank2) {
+            return c1;
+        }
+        if (rank2 < rank1) {
+            return c2;
+        }
+        if (crowdingDistance1 > crowdingDistance2) {
+            return c1;
+        }
+        if (crowdingDistance2 > crowdingDistance1) {
+            return c2;
+        }
+        // Return a random chromosome if they have equal rank and crowding distance.
+        if (ThreadLocalRandom.current().nextDouble() < 0.5) {
+            return c1;
+        }
+        return c1;
+    }
+
+    void NSGA_II() {
+        for (int generation = 0; generation < this.maxGeneration; generation++) {
+            List<Chromosome> newPopulation = new ArrayList<>(this.population.size() * 2);
+
+            while (newPopulation.size() < this.population.size()) {
+                // TODO change this tournament to the crowdingTournamentSelection ?
+                Chromosome[] parents = tournamentSelection(2);
+                Chromosome[] offsprings = crossover(parents[0], parents[1]);
+                for (Chromosome chromosome : offsprings) {
+                    mutation(chromosome);
+                }
+
+                // Recalculate indexToSegmentIds and fitness
+                for (Chromosome chromosome : offsprings) {
+                    chromosome.indexToSegmentIds = genotypeToPhenotype(chromosome);
+
+                    double edgeValue = edgeValue(chromosome.indexToSegmentIds);
+                    double connectivityMeasure = connectivityMeasure(chromosome.indexToSegmentIds);
+                    double overallDeviation = overallDeviation(chromosome.indexToSegmentIds);
+
+                    chromosome.fitness = weightedSumFitness(edgeValue, connectivityMeasure, overallDeviation);
+                }
+
+                newPopulation.addAll(Arrays.asList(offsprings));
+            }
+
+            newPopulation.addAll(this.population);
+            // The population now consists of all the parents and all the offsprings.
+
+            // TODO sort by crowding distance
+            Map<Chromosome, Double> crowdingDistance = new HashMap<>();
+            Map<Chromosome, Integer> rank = new HashMap<>();
+
+            // TODO instead of removing random members of the cut-in-half-front, use
+            // TODO niching. See the box on page 50 in the slides.
+
+            // Removes the last half of the population
+            newPopulation.subList(newPopulation.size() / 2, newPopulation.size()).clear();
+        }
+    }
+
+    public void simpleGeneticAlgorithm() {
         for (int generation = 0; generation < this.maxGeneration; generation++) {
             List<Chromosome> newPopulation = new ArrayList<>(this.population.size());
 
@@ -533,20 +602,24 @@ public class Solver {
                 newPopulation.addAll(Arrays.asList(offsprings));
             }
 
-            // Generational with elitism for now
-            // TODO elitism ratio config param
-            elitism(this.population, newPopulation, 5);
+            elitism(this.population, newPopulation, this.sgaElitismCount);
+
+            // Set the current population to this new, hopefully better, population
             this.population = newPopulation;
 
-            double bestFitness = Double.POSITIVE_INFINITY;
-            // Chromosome bestChromosome = null;
+            Chromosome bestChromosome = this.population.get(0);
             for (Chromosome chromosome : this.population) {
-                if (chromosome.fitness < bestFitness) {
-                    bestFitness = chromosome.fitness;
-                    // bestChromosome = chromosome;
+                if (chromosome.fitness < bestChromosome.fitness) {
+                    bestChromosome = chromosome;
                 }
             }
-            System.out.println("Best fitness:" + bestFitness);
+            System.out.println("Best fitness:" + bestChromosome.fitness);
+            double edgeValue = edgeValue(bestChromosome.indexToSegmentIds);
+            double connectivityMeasure = connectivityMeasure(bestChromosome.indexToSegmentIds);
+            double overallDeviation = overallDeviation(bestChromosome.indexToSegmentIds);
+            System.out.println("\tEdge value: " + edgeValue);
+            System.out.println("\tConnectivity measure: " + connectivityMeasure);
+            System.out.println("\tOverall deviation: " + overallDeviation);
 
         }
 

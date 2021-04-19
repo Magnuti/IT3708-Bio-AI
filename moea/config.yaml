@@ -1,6 +1,6 @@
 image_directory: 86016
 
-population_size: 50
+population_size: 20
 max_generation: 100
 
 # Stop the genetic algorithm when if we reach this fitness
@@ -9,7 +9,14 @@ stop_threshold: 0.0
 crossover_probability: 0.7
 
 # The probability of applying mutation
-mutation_rate: 0.2
+mutation_probability: 0.2
+
+# How many parents should compete in the tournament for which parent should get to breed
+tournament_size: 4
+
+# Ratio of how many of the best parents should be brought into the next
+# generation regardless of generation number. This only applies to the SGA.
+sga_elitism: 0.01
 
 verbose: true
 

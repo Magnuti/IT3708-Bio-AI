@@ -25,7 +25,7 @@ public class App {
         BufferedImage image = openImage(configParser.imageDirectory);
 
         Solver solver = new Solver(configParser, image);
-        solver.runGA();
+        solver.simpleGeneticAlgorithm();
     }
 
     static BufferedImage openImage(String image_directory) {
