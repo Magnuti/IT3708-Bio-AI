@@ -449,15 +449,42 @@ public class Solver {
         return Math.sqrt(Math.pow(distanceRed, 2) + Math.pow(distanceGreen, 2) + Math.pow(distanceBlue, 2));
     }
 
-    Chromosome[] tournamentSelection(int selection_size) {
+    /**
+     * Return the winners of the crowding tournament. The winners are the one with
+     * the best/lowest rank or the one with the best/highest crowding distance
+     * compared to an individual with equal rank. Returns the first element if all
+     * are equal.
+     */
+    private Chromosome[] crowdingTournamentSelection(int selection_size, Map<Chromosome, Double> crowdingDistances,
+            Map<Chromosome, Integer> ranks) {
         Chromosome[] winners = new Chromosome[selection_size];
         for (int i = 0; i < selection_size; i++) {
             // selection_size number of tournaments
-            List<Chromosome> tournamentSet = new ArrayList<>(this.tournamentSize);
-            for (int j = 0; j < this.tournamentSize; j++) {
-                // ? Duplicates allowed in the tournamentSet now, should this be allowed?
-                tournamentSet.add(Helper.getRandomElementFromList(this.population));
+            List<Chromosome> tournamentSet = new ArrayList<>(
+                    Helper.getNRandomElementsFromList(this.population, this.tournamentSize));
+
+            Chromosome bestChromosome = tournamentSet.get(0);
+            for (Chromosome c : tournamentSet.subList(1, tournamentSet.size())) {
+                // Loop all except the first one
+                if (ranks.get(c) < ranks.get(bestChromosome) || (ranks.get(c) == ranks.get(bestChromosome)
+                        && crowdingDistances.get(c) > crowdingDistances.get(bestChromosome))) {
+                    bestChromosome = c;
+                }
             }
+            winners[i] = bestChromosome;
+        }
+        return winners;
+    }
+
+    /**
+     * Tournament selection based on fitness.
+     */
+    Chromosome[] tournamentSelectionSGA(int selection_size) {
+        Chromosome[] winners = new Chromosome[selection_size];
+        for (int i = 0; i < selection_size; i++) {
+            // selection_size number of tournaments
+            List<Chromosome> tournamentSet = new ArrayList<>(
+                    Helper.getNRandomElementsFromList(this.population, this.tournamentSize));
 
             // Select the best parent without any chance to select a random winner. This
             // differs from the MDVRP project.
@@ -510,39 +537,16 @@ public class Solver {
         }
     }
 
-    /**
-     * Return the winner of the crowding tournament. The winner is the one with the
-     * best/lowest rank or the one with the best/highest crowding distance if they
-     * have equal rank. Returns a random element if both are equal.
-     */
-    private Chromosome crowdingTournamentSelection(Chromosome c1, Chromosome c2, int rank1, int rank2,
-            double crowdingDistance1, double crowdingDistance2) {
-        if (rank1 < rank2) {
-            return c1;
-        }
-        if (rank2 < rank1) {
-            return c2;
-        }
-        if (crowdingDistance1 > crowdingDistance2) {
-            return c1;
-        }
-        if (crowdingDistance2 > crowdingDistance1) {
-            return c2;
-        }
-        // Return a random chromosome if they have equal rank and crowding distance.
-        if (ThreadLocalRandom.current().nextDouble() < 0.5) {
-            return c1;
-        }
-        return c1;
-    }
-
     void NSGA_II() {
+        // ! Read on how to find this crowding distance and rank
+        Map<Chromosome, Double> crowdingDistances = new HashMap<>();
+        Map<Chromosome, Integer> ranks = new HashMap<>();
         for (int generation = 0; generation < this.maxGeneration; generation++) {
             List<Chromosome> newPopulation = new ArrayList<>(this.population.size() * 2);
 
             while (newPopulation.size() < this.population.size()) {
-                // TODO change this tournament to the crowdingTournamentSelection ?
-                Chromosome[] parents = tournamentSelection(2);
+                // Select two parents
+                Chromosome[] parents = crowdingTournamentSelection(2, crowdingDistances, ranks);
                 Chromosome[] offsprings = crossover(parents[0], parents[1]);
                 for (Chromosome chromosome : offsprings) {
                     mutation(chromosome);
@@ -565,15 +569,18 @@ public class Solver {
             newPopulation.addAll(this.population);
             // The population now consists of all the parents and all the offsprings.
 
-            // TODO sort by crowding distance
-            Map<Chromosome, Double> crowdingDistance = new HashMap<>();
-            Map<Chromosome, Integer> rank = new HashMap<>();
+            // TODO sort by crowding distance or sort by rank. I think rank
 
             // TODO instead of removing random members of the cut-in-half-front, use
             // TODO niching. See the box on page 50 in the slides.
 
             // Removes the last half of the population
-            newPopulation.subList(newPopulation.size() / 2, newPopulation.size()).clear();
+            List<Chromosome> toRemoveList = newPopulation.subList(newPopulation.size() / 2, newPopulation.size());
+            for (Chromosome c : toRemoveList) {
+                crowdingDistances.remove(c);
+                ranks.remove(c);
+            }
+            toRemoveList.clear();
         }
     }
 
@@ -582,7 +589,7 @@ public class Solver {
             List<Chromosome> newPopulation = new ArrayList<>(this.population.size());
 
             while (newPopulation.size() < this.population.size()) {
-                Chromosome[] parents = tournamentSelection(2);
+                Chromosome[] parents = tournamentSelectionSGA(2);
                 Chromosome[] offsprings = crossover(parents[0], parents[1]);
                 for (Chromosome chromosome : offsprings) {
                     mutation(chromosome);
