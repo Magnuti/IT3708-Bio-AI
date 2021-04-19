@@ -11,7 +11,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Set;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.awt.Color;
 import javax.imageio.ImageIO;
@@ -537,10 +539,80 @@ public class Solver {
         }
     }
 
+    /**
+     * Returns true if c1 dominates c2.
+     * 
+     * @param c1
+     * @param c2
+     * @return
+     */
+    boolean dominates(Chromosome c1, Chromosome c2) {
+        if (c1.edgeValue < c2.edgeValue && c1.connectivityMeasure < c2.connectivityMeasure
+                && c1.overallDeviation < c2.overallDeviation) {
+            return true;
+        }
+        return false;
+    }
+
+    Map<Chromosome, Integer> fastNonDominatedSort(List<Chromosome> population) {
+        // Page 3 in https://ieeexplore.ieee.org/document/996017
+        Map<Chromosome, Set<Chromosome>> S = new HashMap<>();
+        Map<Integer, Set<Chromosome>> F = new HashMap<>();
+        Map<Chromosome, Integer> n = new HashMap<>();
+        Map<Chromosome, Integer> ranks = new HashMap<>();
+
+        F.put(1, new HashSet<>());
+
+        for (Chromosome p : population) {
+            S.put(p, new HashSet<>());
+            n.put(p, 0);
+            for (Chromosome q : population) {
+                if (dominates(p, q)) {
+                    // p dominates q
+                    // Add q to the set of solutions dominated by p
+                    S.get(p).add(q);
+                } else if (dominates(q, p)) {
+                    // q dominates p
+                    // Increment the domination counter of p
+                    n.put(p, n.get(p) + 1);
+                }
+            }
+            if (n.get(p) == 0) {
+                ranks.put(p, 1);
+                F.get(1).add(p);
+            }
+        }
+
+        int i = 1;
+        while (!F.get(i).isEmpty()) {
+            Set<Chromosome> Q = new HashSet<>();
+            for (Chromosome p : F.get(i)) {
+                for (Chromosome q : S.get(p)) {
+                    n.put(q, n.get(q) - 1);
+                    if (n.get(q) == 0) {
+                        ranks.put(q, i + 1);
+                        Q.add(q);
+                    }
+                }
+            }
+            i++;
+            F.put(i, Q);
+        }
+
+        return ranks;
+    }
+
     void NSGA_II() {
         // ! Read on how to find this crowding distance and rank
         Map<Chromosome, Double> crowdingDistances = new HashMap<>();
-        Map<Chromosome, Integer> ranks = new HashMap<>();
+        Map<Chromosome, Integer> ranks = fastNonDominatedSort(this.population);
+
+        // Calculate crowding distances for the initial population
+        for (Chromosome c : this.population) {
+            // TODO
+            crowdingDistances.put(c, 0.0);
+        }
+
         for (int generation = 0; generation < this.maxGeneration; generation++) {
             List<Chromosome> newPopulation = new ArrayList<>(this.population.size() * 2);
 

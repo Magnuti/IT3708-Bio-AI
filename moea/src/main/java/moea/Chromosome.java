@@ -7,6 +7,9 @@ public class Chromosome {
     PixelDirection[] pixelDirections;
     double fitness; // Less fitness is better, this is a minimization problem
     int[] indexToSegmentIds;
+    double edgeValue; // ! TODO init these values
+    double connectivityMeasure;
+    double overallDeviation;
 
     public Chromosome(PixelDirection[] pixelDirections) {
         this.pixelDirections = pixelDirections;
