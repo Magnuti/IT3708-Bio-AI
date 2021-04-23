@@ -90,7 +90,7 @@ public class Chromosome {
                 int neighborIndex = neighborArrays[i][j];
                 if (neighborIndex != -1) {
                     if (this.indexToSegmentIds[i] != this.indexToSegmentIds[neighborIndex]) {
-                        connectivity += (1 / 8);
+                        connectivity += (1.0 / 8.0);
                     }
                 }
             }

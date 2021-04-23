@@ -183,7 +183,8 @@ public class NSGA2 {
 
         // Loop the objectives
         for (int objectiveFunction = 0; objectiveFunction < 3; objectiveFunction++) {
-            // Sort using each objective value
+            // Sort using each objective value, note that the sort is different for every
+            // iteration of the loop.
             double[] objectiveValues;
             if (objectiveFunction == 0) {
                 sameRankPopulation.sort(Comparator.comparing(c -> c.edgeValue));
@@ -196,15 +197,19 @@ public class NSGA2 {
                 objectiveValues = sameRankPopulation.stream().mapToDouble(c -> c.overallDeviation).toArray();
             }
 
-            // Assign a large value to the boundary solutions so that boundary points are
-            // always selected
+            // Assign a large value to the boundary solutions with respect to this objective
+            // function such that boundary points are always selected.
             distances.put(sameRankPopulation.get(0), Double.POSITIVE_INFINITY);
             distances.put(sameRankPopulation.get(sameRankPopulation.size() - 1), Double.POSITIVE_INFINITY);
 
             double maxF = Arrays.stream(objectiveValues).max().getAsDouble();
             double minF = Arrays.stream(objectiveValues).min().getAsDouble();
             if (maxF == minF) {
-                maxF += 0.001; // ! Hotfix so we don't divide by zero
+                // So we don't divide by zero when the population have entirely equal objective
+                // function values. This happens when the population is initialized since both
+                // edge value and connectivity measure is 0.0 due to the MST. This also happens
+                // some times in the early stages of the GA.
+                maxF += 1e-5;
             }
 
             // For all other points we assign this
@@ -313,6 +318,13 @@ public class NSGA2 {
                     break;
                 }
             }
+
+            System.out.println(
+                    "Edge value: " + this.population.stream().mapToDouble(c -> c.edgeValue).summaryStatistics());
+            System.out.println("Connectivity measure: "
+                    + this.population.stream().mapToDouble(c -> c.connectivityMeasure).summaryStatistics());
+            System.out.println("Overall deviation: "
+                    + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
 
             assert (this.population.size() == popSize); // TODO temp
         }
