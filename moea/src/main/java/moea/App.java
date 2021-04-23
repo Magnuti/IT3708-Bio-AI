@@ -24,9 +24,8 @@ public class App {
 
         BufferedImage image = openImage(configParser.imageDirectory);
 
-        Solver solver = new Solver(configParser, image);
-        // solver.simpleGeneticAlgorithm();
-        solver.NSGA_II();
+        NSGA2 nsga2 = new NSGA2(configParser, image);
+        nsga2.runGA();
     }
 
     static BufferedImage openImage(String image_directory) {
