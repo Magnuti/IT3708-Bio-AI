@@ -56,22 +56,23 @@ public class NSGA2 {
 
         // TODO multi-thread
         for (int i = 0; i < this.population.size(); i++) {
-            System.out.println("Chromosome: " + i);
             Chromosome chromosome = this.population.get(i);
             chromosome.calculateIndexToSegmentIds(this.N, this.neighborArrays);
-
             chromosome.calculateEdgeValue(this.neighborArrays, this.image);
             chromosome.calculateConnectivityMeasure(this.neighborArrays, this.image);
             chromosome.calculateOverallDeviation(this.image);
-            System.out.println("Edge value: " + chromosome.edgeValue);
-            System.out.println("Connectivity measure: " + chromosome.connectivityMeasure);
-            System.out.println("Overall deviation: " + chromosome.overallDeviation);
 
             BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(chromosome, this.image.getWidth(),
-                    this.image.getHeight());
+                    this.image.getHeight(), this.neighborArrays);
 
             Utils.saveImage(bufferedImage, Integer.toString(i));
         }
+
+        System.out.println("Edge value: " + this.population.stream().mapToDouble(c -> c.edgeValue).summaryStatistics());
+        System.out.println("Connectivity measure: "
+                + this.population.stream().mapToDouble(c -> c.connectivityMeasure).summaryStatistics());
+        System.out.println("Overall deviation: "
+                + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
     }
 
     void initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
@@ -332,7 +333,7 @@ public class NSGA2 {
         // Save all images once the GA is finished
         for (int i = 0; i < this.population.size(); i++) {
             BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(this.population.get(i),
-                    this.image.getWidth(), this.image.getHeight());
+                    this.image.getWidth(), this.image.getHeight(), this.neighborArrays);
             Utils.saveImage(bufferedImage, "last_" + i);
         }
     }

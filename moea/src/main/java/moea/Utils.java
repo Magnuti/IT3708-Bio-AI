@@ -6,11 +6,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.awt.Color;
+import java.awt.Graphics2D;
 
 import javax.imageio.ImageIO;
 
@@ -215,59 +214,32 @@ public class Utils {
     }
 
     public static BufferedImage createBufferedImageFromChromosome(Chromosome chromosome, int imageWidth,
-            int imageHeight) {
-        BufferedImage bufferedImage = new BufferedImage(imageWidth, imageHeight,
-                // BufferedImage.TYPE_BYTE_BINARY);
-                BufferedImage.TYPE_INT_RGB);
+            int imageHeight, int[][] neighborArrays) {
+        BufferedImage bufferedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_BYTE_BINARY);
 
-        final int WHITE = new Color(255, 255, 255).getRGB();
-        final int BLACK = new Color(0, 0, 0).getRGB();
-
-        // for (int y = 0; y < this.image.getHeight(); y++) {
-        // for (int x = 0; x < this.image.getWidth(); x++) {
-        // bufferedImage.setRGB(x, y, WHITE);
-        // }
-        // }
+        // Initialize the entire image as white
+        Graphics2D graphics = bufferedImage.createGraphics();
+        graphics.setPaint(new Color(255, 255, 255));
+        graphics.fillRect(0, 0, imageWidth, imageHeight);
+        graphics.dispose();
 
         // TODO create both type 1 and ype
 
-        Map<Integer, Color> colors = new HashMap<>();
-        for (int j = 0; j < chromosome.indexToSegmentIds.length; j++) {
-            if (!colors.containsKey(chromosome.indexToSegmentIds[j])) {
-                float r = ThreadLocalRandom.current().nextFloat();
-                float g = ThreadLocalRandom.current().nextFloat();
-                float b = ThreadLocalRandom.current().nextFloat();
-                colors.put(chromosome.indexToSegmentIds[j], new Color(r, g, b));
-            }
-        }
-
-        System.out.println("Segments " + colors.keySet().size());
-        System.out.println();
+        final int BLACK = new Color(0, 0, 0).getRGB();
 
         for (int pixel = 0; pixel < imageWidth * imageHeight; pixel++) {
-            int y = pixel / imageWidth;
-            int x = pixel % imageWidth;
-            bufferedImage.setRGB(x, y, colors.get(chromosome.indexToSegmentIds[pixel]).getRGB());
+            for (int neighborIndex = 1; neighborIndex < neighborArrays[pixel].length; neighborIndex++) {
+                int neighborPixel = neighborArrays[pixel][neighborIndex];
+                if (neighborPixel == -1
+                        || chromosome.indexToSegmentIds[pixel] != chromosome.indexToSegmentIds[neighborPixel]) {
+                    // Set the pixel to black if it is on the image border or the segment border
+                    int y = pixel / imageWidth;
+                    int x = pixel % imageWidth;
+                    bufferedImage.setRGB(x, y, BLACK);
+                    break; // No need to check the rest of the neighbors for this pixel
+                }
+            }
         }
-
-        // TODO add black borders around the image. Just set the pixel to black if it
-        // TODO has a -1 neighbor.
-
-        // for (int pixel = 0; pixel < this.N; pixel++) {
-        // for (int neighborIndex = 1; neighborIndex <
-        // this.neighborArrays[pixel].length; neighborIndex++) {
-        // int neighborPixel = this.neighborArrays[pixel][neighborIndex];
-        // if (neighborPixel == -1) {
-        // continue;
-        // }
-        // if (indexToSegmentIds[pixel] != indexToSegmentIds[neighborPixel]) {
-        // int y = pixel / this.image.getWidth();
-        // int x = pixel % this.image.getWidth();
-        // bufferedImage.setRGB(x, y, BLACK);
-        // break; // No need to check the rest of the neighbors for this pixel
-        // }
-        // }
-        // }
 
         return bufferedImage;
     }
