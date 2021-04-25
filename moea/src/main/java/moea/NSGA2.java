@@ -20,6 +20,7 @@ public class NSGA2 {
     final private int N; // Number of pixels in the image
 
     // Config arguments
+    final private int populationSize;
     final private int maxGeneration;
     final private double stopThreshold;
     final private double crossoverProbability;
@@ -36,6 +37,7 @@ public class NSGA2 {
     public NSGA2(ConfigParser configParser, BufferedImage image) {
         this.image = image;
         this.N = image.getHeight() * image.getWidth();
+        this.populationSize = configParser.populationSize;
         this.maxGeneration = configParser.maxGeneration;
         this.stopThreshold = configParser.stopThreshold;
         this.crossoverProbability = configParser.crossoverProbability;
@@ -51,16 +53,13 @@ public class NSGA2 {
         this.edgeValues = Utils.constructEdgeValues(this.image);
 
         MST mst = new MST(edgeValues, neighborArrays);
-        initPopulationByMinimumSpanningTree(configParser.populationSize, mst);
+        initPopulationByMinimumSpanningTree(this.populationSize, mst);
         // initRandomPopulation(configParser.populationSize);
 
         // TODO multi-thread
         for (int i = 0; i < this.population.size(); i++) {
             Chromosome chromosome = this.population.get(i);
-            chromosome.calculateIndexToSegmentIds(this.N, this.neighborArrays);
-            chromosome.calculateEdgeValue(this.neighborArrays, this.image);
-            chromosome.calculateConnectivityMeasure(this.neighborArrays, this.image);
-            chromosome.calculateOverallDeviation(this.image);
+            chromosome.recalculateObjectives(this.N, this.neighborArrays, this.image);
 
             BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(chromosome, this.image.getWidth(),
                     this.image.getHeight(), this.neighborArrays);
@@ -104,6 +103,7 @@ public class NSGA2 {
                 // Loop all except the first one
                 if (ranks.get(c) < ranks.get(bestChromosome) || (ranks.get(c) == ranks.get(bestChromosome)
                         && crowdingDistances.get(c) > crowdingDistances.get(bestChromosome))) {
+                    // Crowding-comparison operator
                     bestChromosome = c;
                 }
             }
@@ -118,6 +118,7 @@ public class NSGA2 {
     boolean dominates(Chromosome c1, Chromosome c2) {
         if (c1.edgeValue < c2.edgeValue && c1.connectivityMeasure < c2.connectivityMeasure
                 && c1.overallDeviation < c2.overallDeviation) {
+            System.out.println(ConsoleColors.GREEN + "Domination found" + ConsoleColors.RESET);
             return true;
         }
         return false;
@@ -169,6 +170,7 @@ public class NSGA2 {
             i++;
             F.put(i, Q);
         }
+        F.remove(i); // Remove the last set because it is always empty
     }
 
     /**
@@ -199,7 +201,8 @@ public class NSGA2 {
             }
 
             // Assign a large value to the boundary solutions with respect to this objective
-            // function such that boundary points are always selected.
+            // function such that boundary points are always selected. We want to always
+            // select these extremes.
             distances.put(sameRankPopulation.get(0), Double.POSITIVE_INFINITY);
             distances.put(sameRankPopulation.get(sameRankPopulation.size() - 1), Double.POSITIVE_INFINITY);
 
@@ -228,32 +231,18 @@ public class NSGA2 {
         Map<Integer, Set<Chromosome>> F = new HashMap<>();
         fastNonDominatedSort(this.population, ranks, F);
 
-        for (Integer f : F.keySet()) {
-            if (F.get(f).isEmpty()) {
-                // On init the last segment is always empty. This is a temporarily patch, may
-                // fix later.
-                System.out.println(ConsoleColors.YELLOW + "Removed empty set from F." + ConsoleColors.RESET);
-                F.remove(f);
-            }
-        }
-
         Map<Chromosome, Double> crowdingDistances = new HashMap<>();
         for (Integer i : F.keySet()) {
             System.out.println("Init crowding distance for rank " + i + " with size " + F.get(i).size());
             findCrowdingDistances(new ArrayList<>(F.get(i)), crowdingDistances);
         }
 
-        // for (Chromosome c : this.population) {
-        // System.out.println(c);
-        // System.out.println("Rank: " + ranks.get(c));
-        // System.out.println("Distance: " + crowdingDistances.get(c));
-        // }
-
         for (int generation = 0; generation < this.maxGeneration; generation++) {
             System.out.println("Generation: " + generation);
             List<Chromosome> newPopulation = new ArrayList<>(this.population.size() * 2);
+            newPopulation.addAll(this.population);
 
-            while (newPopulation.size() < this.population.size()) {
+            while (newPopulation.size() < this.populationSize * 2) {
                 // Select two parents
                 Chromosome[] parents = crowdingTournamentSelection(2, crowdingDistances, ranks);
                 Chromosome[] offsprings = Utils.crossover(parents[0], parents[1], this.crossoverProbability);
@@ -263,17 +252,15 @@ public class NSGA2 {
 
                 // Recalculate indexToSegmentIds and fitness
                 for (Chromosome chromosome : offsprings) {
-                    chromosome.calculateIndexToSegmentIds(this.N, this.neighborArrays);
-                    chromosome.calculateEdgeValue(this.neighborArrays, this.image);
-                    chromosome.calculateConnectivityMeasure(this.neighborArrays, this.image);
-                    chromosome.calculateOverallDeviation(this.image);
+                    chromosome.recalculateObjectives(this.N, this.neighborArrays, this.image);
                 }
 
+                // The population now consists of all the parents and all the offsprings.
                 newPopulation.addAll(Arrays.asList(offsprings));
+
             }
 
-            newPopulation.addAll(this.population);
-            // The population now consists of all the parents and all the offsprings.
+            assert (this.population.size() == this.populationSize); // TODO temp
 
             // First combine, then sort on rank, then sort on cr. distance. We need to
             // combine the populations then do sorting.
@@ -281,41 +268,26 @@ public class NSGA2 {
             F.clear();
             fastNonDominatedSort(newPopulation, ranks, F);
 
-            for (Integer f : F.keySet()) {
-                if (F.get(f).isEmpty()) {
-                    // On init the last segment is always empty. This is a temporarily patch, may
-                    // fix later.
-                    System.out.println(ConsoleColors.YELLOW + "Removed empty set from F." + ConsoleColors.RESET);
-                    F.remove(f);
-                }
-            }
-
             // Need to clear since the ranks are changed, thus we need to recalculate the
             // distances because they are based on ranks.
             crowdingDistances.clear();
-            for (Integer i : F.keySet()) {
-                System.out.println("Init crowding distance for rank:" + i);
-                System.out.println(F.get(i).size());
-                findCrowdingDistances(new ArrayList<>(F.get(i)), crowdingDistances);
-            }
 
             // Set the population of the next generation
-            int popSize = this.population.size(); // TODO make a final at the top
             this.population.clear();
-            for (Integer f : F.keySet()) {
-                if (F.get(f).size() <= popSize - this.population.size()) {
+            for (Integer i : F.keySet()) {
+                System.out.println("Init crowding distance for rank " + i + " with size " + F.get(i).size());
+                findCrowdingDistances(new ArrayList<>(F.get(i)), crowdingDistances);
+                if (F.get(i).size() <= this.populationSize - this.population.size()) {
                     // Add all individuals in this rank because we can
-                    this.population.addAll(F.get(f));
+                    this.population.addAll(F.get(i));
                 } else {
-                    // Add some of the individuals from this rank
-                    List<Chromosome> sameRankPopulation = new ArrayList<>(F.get(f));
-
-                    // TODO look over this. Is it correct to pick the ones with highest distance?
+                    // Add some of the individuals from this rank based on their crowding distance.
+                    List<Chromosome> sameRankPopulation = new ArrayList<>(F.get(i));
                     sameRankPopulation.sort(Comparator.comparing(c -> crowdingDistances.get(c)));
                     // We want the ones with the highest crowding distances
                     Collections.reverse(sameRankPopulation);
                     // The population is now full
-                    this.population.addAll(sameRankPopulation.subList(0, popSize - this.population.size()));
+                    this.population.addAll(sameRankPopulation.subList(0, this.populationSize - this.population.size()));
                     break;
                 }
             }
@@ -327,7 +299,7 @@ public class NSGA2 {
             System.out.println("Overall deviation: "
                     + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
 
-            assert (this.population.size() == popSize); // TODO temp
+            assert (this.population.size() == this.populationSize); // TODO temp
         }
 
         // Save all images once the GA is finished

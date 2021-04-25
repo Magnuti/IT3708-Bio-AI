@@ -27,26 +27,35 @@ public class Chromosome {
      */
     public Chromosome(Chromosome chromosomeToCopy) {
         this.pixelDirections = chromosomeToCopy.pixelDirections.clone();
-        this.indexToSegmentIds = chromosomeToCopy.indexToSegmentIds.clone();
+    }
+
+    public void recalculateObjectives(int N, int[][] neighborArrays, BufferedImage image) {
+        calculateIndexToSegmentIds(N, neighborArrays);
+        calculateEdgeValue(neighborArrays, image);
+        calculateConnectivityMeasure(neighborArrays, image);
+        calculateOverallDeviation(image);
     }
 
     /**
      * Calculates an array where each index represents the segment ID of a pixel.
      * So, [1, 1, 5, ...] means that pixel 0 and 1 belongs to segment 1 and pixel 2
-     * belongs to segment 5.
+     * belongs to segment 5. The segment IDs are not incremental, rather each
+     * segment ID points to some pixel index in the image. So, a total of three
+     * segments may have indices 43, 121 and 9.
      */
-    void calculateIndexToSegmentIds(int N, int[][] neighborArrays) {
-        int[] indexToSegmentIds = new int[N];
+    private void calculateIndexToSegmentIds(int N, int[][] neighborArrays) {
         DisjointSets disjointSets = new DisjointSets(N);
         for (int i = 0; i < N; i++) {
             PixelDirection pixelDirection = this.pixelDirections[i];
             int neighborIndex = neighborArrays[i][pixelDirection.ordinal()];
-            if (neighborIndex == -1 || neighborIndex == i) {
+            if (neighborIndex == -1) {
+                // Points to a border pixel or itself
                 continue;
             }
             disjointSets.union(i, neighborIndex);
         }
 
+        int[] indexToSegmentIds = new int[N];
         // Let each pixel point to its representative, this way all indices pointing to
         // the same number is in the same segment
         for (int i = 0; i < N; i++) {
@@ -56,7 +65,7 @@ public class Chromosome {
         this.indexToSegmentIds = indexToSegmentIds;
     }
 
-    void calculateEdgeValue(int[][] neighborArrays, BufferedImage image) {
+    private void calculateEdgeValue(int[][] neighborArrays, BufferedImage image) {
         // Normally we want to maximize this, but since the other two objectives are to
         // be minimized we should also minimize this. So, we use -= instead of +=.
         double edgeValue = 0.0;
@@ -78,7 +87,7 @@ public class Chromosome {
         this.edgeValue = edgeValue;
     }
 
-    void calculateConnectivityMeasure(int[][] neighborArrays, BufferedImage image) {
+    private void calculateConnectivityMeasure(int[][] neighborArrays, BufferedImage image) {
         // We want to minimize this
         double connectivity = 0.0;
         for (int i = 0; i < image.getWidth() * image.getHeight(); i++) {
@@ -98,14 +107,14 @@ public class Chromosome {
         this.connectivityMeasure = connectivity;
     }
 
-    void calculateOverallDeviation(BufferedImage image) {
+    private void calculateOverallDeviation(BufferedImage image) {
         // We want to minimize this
 
         // Calculates centroid for each segment
         Map<Integer, List<Integer>> segmentSumsR = new HashMap<>();
         Map<Integer, List<Integer>> segmentSumsG = new HashMap<>();
         Map<Integer, List<Integer>> segmentSumsB = new HashMap<>();
-        for (int i = 0; i < this.indexToSegmentIds.length; i++) {
+        for (int i = 0; i < image.getWidth() * image.getHeight(); i++) {
             int segmentId = this.indexToSegmentIds[i];
             int rgb = Utils.getRgbFromIndex(image, i);
             int r = (rgb >> 16) & 0xFF;
@@ -150,12 +159,12 @@ public class Chromosome {
             rgb = (rgb << 8) + segmentCentroidsB.get(key);
             segmentCentroids.put(key, rgb);
         }
+        // Now we have the centroid for each segment
 
         double deviation = 0.0;
-        // Loop all segment_sets
         for (Integer key : segmentCentroids.keySet()) {
             // Loop all pixels in that segment_set
-            for (int i = 0; i < this.indexToSegmentIds.length; i++) {
+            for (int i = 0; i < image.getWidth() * image.getHeight(); i++) {
                 if (this.indexToSegmentIds[i] == key) {
                     deviation += Utils.getRgbDistance(Utils.getRgbFromIndex(image, i), segmentCentroids.get(key));
                 }
