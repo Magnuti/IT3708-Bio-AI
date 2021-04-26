@@ -73,7 +73,7 @@ public class Chromosome {
             // Loop the neighbor pixels of pixel i
             // if j is not in the same segment then add a number from equation 2
             // edgeValue += getRgbDistance(...)
-            for (int j = 1; i < neighborArrays[0].length; i++) {
+            for (int j = 1; j < neighborArrays[0].length; j++) {
                 // Skip the first neighbor index since it points to itself
                 int neighborIndex = neighborArrays[i][j];
                 if (neighborIndex != -1) {
@@ -94,7 +94,7 @@ public class Chromosome {
             // Loop the neighbor pixels of pixel i
             // if j is not in the same segment then add a number from equation 4
             // connectivity += 1/8
-            for (int j = 1; i < neighborArrays[0].length; i++) {
+            for (int j = 1; j < neighborArrays[0].length; j++) {
                 // Skip the first neighbor index since it points to itself
                 int neighborIndex = neighborArrays[i][j];
                 if (neighborIndex != -1) {
