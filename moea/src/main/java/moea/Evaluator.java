@@ -17,8 +17,8 @@ import javafx.scene.image.PixelReader;
  * implement the FeedbackStation interface yourselves.
  */
 public final class Evaluator implements Runnable {
-	String optFolder = "gt/";
-	String studFolder = "my_sol/";
+	String optFolder = "training_images/86016/"; // TODO take in input folder
+	String studFolder = "output_images/final_images/";
 
 	final double colorValueSlackRange = 40.0 / 255.0;
 	final double blackValueThreshold = 100.0 / 255.0;
@@ -125,26 +125,28 @@ public final class Evaluator implements Runnable {
 		return counter / Math.max(numBlackPixels, 1.0);
 	}
 
-	private List<File> getFilesInDir(String directory) {
+	private List<File> getGroundTruthFiles(String directory) {
 		File dir = new File(directory);
 		List<File> files = new ArrayList<>();
-		files.addAll(Arrays.asList(dir.listFiles()));
-		File[] ordered = new File[files.size()];
-		for (File f : files) {
-			String lastPart = f.getName().split("_")[1];
-			int num = Integer.parseInt(lastPart.substring(0, lastPart.length() - 4));
-			ordered[num] = f;
+		for (File f : dir.listFiles()) {
+			if (f.getName().substring(0, 2).equals("GT")) {
+				files.add(f);
+			}
 		}
-		files = Arrays.asList(ordered);
 		return files;
 	}
 
+	private List<File> getSolutionFiles(String directory) {
+		File dir = new File(directory);
+		return new ArrayList<>(Arrays.asList(dir.listFiles()));
+	}
+
 	public void updateOptimalFiles() {
-		optFiles = getFilesInDir(optFolder);
+		optFiles = getGroundTruthFiles(optFolder);
 	}
 
 	public void updateStudentFiles() {
-		studFiles = getFilesInDir(studFolder);
+		studFiles = getSolutionFiles(studFolder);
 	}
 
 	private void updateImageLists() {
