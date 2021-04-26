@@ -64,7 +64,7 @@ public class NSGA2 {
             BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(chromosome, this.image.getWidth(),
                     this.image.getHeight(), this.neighborArrays);
 
-            Utils.saveImage(bufferedImage, Integer.toString(i));
+            Utils.saveImage(bufferedImage, Integer.toString(i), "initial_images");
         }
 
         System.out.println("Edge value: " + this.population.stream().mapToDouble(c -> c.edgeValue).summaryStatistics());
@@ -306,7 +306,7 @@ public class NSGA2 {
         for (int i = 0; i < this.population.size(); i++) {
             BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(this.population.get(i),
                     this.image.getWidth(), this.image.getHeight(), this.neighborArrays);
-            Utils.saveImage(bufferedImage, "last_" + i);
+            Utils.saveImage(bufferedImage, "last_" + i, "final_images");
         }
     }
 }
