@@ -26,6 +26,19 @@ public class App {
 
         NSGA2 nsga2 = new NSGA2(configParser, image);
         nsga2.runGA();
+
+        SharedScores sharedScores = new SharedScores();
+        Thread evaluatorThread = new Thread(new Evaluator(sharedScores));
+        evaluatorThread.start();
+
+        // Active poll the scoress
+        while (sharedScores.scores == null) {
+            continue;
+        }
+
+        for (int i = 0; i < sharedScores.scores.length; i++) {
+            System.out.println(sharedScores.scores[i]);
+        }
     }
 
     static BufferedImage openImage(String image_directory) {

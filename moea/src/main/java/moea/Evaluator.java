@@ -17,8 +17,8 @@ import javafx.scene.image.PixelReader;
  * implement the FeedbackStation interface yourselves.
  */
 public final class Evaluator implements Runnable {
-	String optFolder = "EVALUATOR/optimal/blackWhite/";
-	String studFolder = "EVALUATOR/student/blackWhite/";
+	String optFolder = "gt/";
+	String studFolder = "my_sol/";
 
 	final double colorValueSlackRange = 40.0 / 255.0;
 	final double blackValueThreshold = 100.0 / 255.0;
@@ -30,24 +30,27 @@ public final class Evaluator implements Runnable {
 	List<Image> optImages;
 	List<Image> studImages;
 
-	// private final FeedbackStation feedbackStation;
+	private final SharedScores sharedScores;
 
-	public Evaluator(/* FeedbackStation feedbackStation */) {
-		// this.feedbackStation = feedbackStation;
+	public Evaluator(SharedScores sharedScores) {
+		this.sharedScores = sharedScores;
 		optFiles = new ArrayList<>();
 		studFiles = new ArrayList<>();
 		optImages = new ArrayList<>();
 		studImages = new ArrayList<>();
+		Platform.startup(() -> {
+			System.out.println("Platform start");
+		});
 	}
 
 	@Override
 	public void run() {
-		updateOptimalFiles();
-		updateStudentFiles();
-		updateImageLists();
-		double[] scores = evaluate();
 		Platform.runLater(() -> {
-			// feedbackStation.registerScores(scores);
+			updateOptimalFiles();
+			updateStudentFiles();
+			updateImageLists();
+			this.sharedScores.scores = evaluate();
+			Platform.exit();
 		});
 	}
 
@@ -128,7 +131,7 @@ public final class Evaluator implements Runnable {
 		files.addAll(Arrays.asList(dir.listFiles()));
 		File[] ordered = new File[files.size()];
 		for (File f : files) {
-			String lastPart = f.getName().split("_")[2];
+			String lastPart = f.getName().split("_")[1];
 			int num = Integer.parseInt(lastPart.substring(0, lastPart.length() - 4));
 			ordered[num] = f;
 		}

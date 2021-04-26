@@ -1,7 +1,7 @@
 image_directory: 86016
 
-population_size: 100
-max_generation: 100
+population_size: 50
+max_generation: 2
 
 # Stop the genetic algorithm when if we reach this fitness
 stop_threshold: 0.0
