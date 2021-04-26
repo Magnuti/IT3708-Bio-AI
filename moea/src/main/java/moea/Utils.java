@@ -199,8 +199,12 @@ public class Utils {
         return Math.sqrt(Math.pow(distanceRed, 2) + Math.pow(distanceGreen, 2) + Math.pow(distanceBlue, 2));
     }
 
-    public static void saveImage(BufferedImage bufferedImage, String name) {
-        File image_path = new File("output_images");
+    public static void saveImage(BufferedImage bufferedImage, String name, String outputPath) {
+        File raw_path = new File("output_images");
+        if (!raw_path.exists()) {
+            raw_path.mkdir();
+        }
+        File image_path = new File(Paths.get(raw_path.toString(), outputPath).toString());
         if (!image_path.exists()) {
             image_path.mkdir();
         }
