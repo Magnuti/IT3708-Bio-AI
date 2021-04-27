@@ -118,7 +118,6 @@ public class NSGA2 {
     boolean dominates(Chromosome c1, Chromosome c2) {
         if (c1.edgeValue < c2.edgeValue && c1.connectivityMeasure < c2.connectivityMeasure
                 && c1.overallDeviation < c2.overallDeviation) {
-            System.out.println(ConsoleColors.GREEN + "Domination found" + ConsoleColors.RESET);
             return true;
         }
         return false;

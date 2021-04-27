@@ -25,19 +25,15 @@ public final class Evaluator implements Runnable {
 	final int pixelCheckRange = 4;
 	final boolean checkEightSurroundingPixels = true;
 
-	List<File> optFiles;
-	List<File> studFiles;
-	List<Image> optImages;
-	List<Image> studImages;
+	List<File> optFiles = new ArrayList<>();
+	List<File> studFiles = new ArrayList<>();
+	List<Image> optImages = new ArrayList<>();
+	List<Image> studImages = new ArrayList<>();
 
-	private final SharedScores sharedScores;
+	private final FeedbackStation feedbackStation;
 
-	public Evaluator(SharedScores sharedScores) {
-		this.sharedScores = sharedScores;
-		optFiles = new ArrayList<>();
-		studFiles = new ArrayList<>();
-		optImages = new ArrayList<>();
-		studImages = new ArrayList<>();
+	public Evaluator(FeedbackStation feedbackStation) {
+		this.feedbackStation = feedbackStation;
 		Platform.startup(() -> {
 			System.out.println("Platform start");
 		});
@@ -49,33 +45,39 @@ public final class Evaluator implements Runnable {
 			updateOptimalFiles();
 			updateStudentFiles();
 			updateImageLists();
-			this.sharedScores.scores = evaluate();
+			this.feedbackStation.evaluatorReturnValues = evaluate();
 			Platform.exit();
 		});
 	}
 
-	public double[] runSameThread() {
-		updateOptimalFiles();
-		updateStudentFiles();
-		updateImageLists();
-		double[] scores = evaluate();
-		return scores;
-	}
+	// public double[] runSameThread() {
+	// updateOptimalFiles();
+	// updateStudentFiles();
+	// updateImageLists();
+	// double[] scores = evaluate();
+	// return scores;
+	// }
 
-	public double[] evaluate() {
-		double[] scores = new double[studImages.size()];
+	public EvaluatorReturnValues[] evaluate() {
+		EvaluatorReturnValues[] evalObjects = new EvaluatorReturnValues[studImages.size()];
 		for (int i = 0; i < studImages.size(); i++) {
 			Image studImg = studImages.get(i);
 			double highestScore = 0.0;
-			for (Image optImg : optImages) {
+			File gtFile = null;
+			for (int k = 0; k < optImages.size(); k++) {
+				// for (Image optImg : optImages) {
+				Image optImg = optImages.get(k);
 				double res1 = compare(studImg, optImg);
 				double res2 = compare(optImg, studImg);
 				double result = Math.min(res1, res2);
-				highestScore = Math.max(highestScore, result);
+				if (result > highestScore) {
+					highestScore = result;
+					gtFile = optFiles.get(k);
+				}
 			}
-			scores[i] = highestScore;
+			evalObjects[i] = new EvaluatorReturnValues(gtFile, studFiles.get(i), highestScore);
 		}
-		return scores;
+		return evalObjects;
 	}
 
 	private double compare(Image optImg, Image studImg) {
@@ -138,7 +140,7 @@ public final class Evaluator implements Runnable {
 
 	private List<File> getSolutionFiles(String directory) {
 		File dir = new File(directory);
-		return new ArrayList<>(Arrays.asList(dir.listFiles()));
+		return Arrays.asList(dir.listFiles());
 	}
 
 	public void updateOptimalFiles() {

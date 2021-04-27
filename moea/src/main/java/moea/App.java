@@ -5,6 +5,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import javax.imageio.ImageIO;
 
 /**
@@ -27,18 +31,29 @@ public class App {
         NSGA2 nsga2 = new NSGA2(configParser, image);
         nsga2.runGA();
 
-        SharedScores sharedScores = new SharedScores();
-        Thread evaluatorThread = new Thread(new Evaluator(sharedScores));
+        FeedbackStation feedbackStation = new FeedbackStation();
+        Thread evaluatorThread = new Thread(new Evaluator(feedbackStation));
         evaluatorThread.start();
 
-        // Active poll the scoress
-        while (sharedScores.scores == null) {
+        // Active poll the scores
+        while (feedbackStation.evaluatorReturnValues == null) {
             continue;
         }
 
-        for (int i = 0; i < sharedScores.scores.length; i++) {
-            System.out.println(sharedScores.scores[i]);
+        EvaluatorReturnValues bestEvalObject = feedbackStation.evaluatorReturnValues[0];
+        for (EvaluatorReturnValues e : feedbackStation.evaluatorReturnValues) {
+            if (e.score > bestEvalObject.score) {
+                bestEvalObject = e;
+            }
         }
+
+        System.out.println("Best score: " + bestEvalObject.score);
+        System.out.println("Solution file: " + bestEvalObject.solutionFile.toPath());
+        System.out.println("GT file: " + bestEvalObject.groundTruthFile.toPath());
+
+        List<Double> scores = Arrays.stream(feedbackStation.evaluatorReturnValues).map(c -> c.score).collect(Collectors.toList());
+        System.out
+                .println("Score statisticss: " + scores.stream().mapToDouble(Double::doubleValue).summaryStatistics());
     }
 
     static BufferedImage openImage(String image_directory) {
