@@ -1,7 +1,8 @@
-image_directory: 86016
+# Test files [86016, 118035, 147091, 176035, 176039, 353013]
+image_directory: 353013
 
 population_size: 50
-max_generation: 2
+max_generation: 20
 
 # Stop the genetic algorithm when if we reach this fitness
 stop_threshold: 0.0

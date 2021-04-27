@@ -199,16 +199,19 @@ public class Utils {
         return Math.sqrt(Math.pow(distanceRed, 2) + Math.pow(distanceGreen, 2) + Math.pow(distanceBlue, 2));
     }
 
-    public static void saveImage(BufferedImage bufferedImage, String name, String outputPath) {
+    public static void saveImage(BufferedImage bufferedImage, String name, String... outputPaths) {
         File raw_path = new File("output_images");
         if (!raw_path.exists()) {
             raw_path.mkdir();
         }
-        File image_path = new File(Paths.get(raw_path.toString(), outputPath).toString());
-        if (!image_path.exists()) {
-            image_path.mkdir();
+        File imagePath = raw_path;
+        for (String s : outputPaths) {
+            imagePath = new File(Paths.get(imagePath.toString(), s).toString());
+            if (!imagePath.exists()) {
+                imagePath.mkdir();
+            }
         }
-        Path path = Paths.get(image_path.getPath(), name + ".jpg");
+        Path path = Paths.get(imagePath.getPath(), name + ".jpg");
         try {
             ImageIO.write(bufferedImage, "jpg", new File(path.toString()));
         } catch (IOException e) {

@@ -17,8 +17,8 @@ import javafx.scene.image.PixelReader;
  * implement the FeedbackStation interface yourselves.
  */
 public final class Evaluator implements Runnable {
-	String optFolder = "training_images/86016/"; // TODO take in input folder
-	String studFolder = "output_images/final_images/";
+	String optFolder;
+	String studFolder;
 
 	final double colorValueSlackRange = 40.0 / 255.0;
 	final double blackValueThreshold = 100.0 / 255.0;
@@ -32,8 +32,9 @@ public final class Evaluator implements Runnable {
 
 	private final FeedbackStation feedbackStation;
 
-	public Evaluator(FeedbackStation feedbackStation) {
+	public Evaluator(FeedbackStation feedbackStation, String inputPath) {
 		this.feedbackStation = feedbackStation;
+		this.optFolder = inputPath;
 		Platform.startup(() -> {
 			System.out.println("Platform start");
 		});
@@ -42,10 +43,25 @@ public final class Evaluator implements Runnable {
 	@Override
 	public void run() {
 		Platform.runLater(() -> {
-			updateOptimalFiles();
-			updateStudentFiles();
-			updateImageLists();
-			this.feedbackStation.evaluatorReturnValues = evaluate();
+			while (!feedbackStation.stop) {
+				try {
+					// this.studFolder = feedbackStation.popSolutionLocation();
+					this.studFolder = feedbackStation.solutionLocations.take();
+					System.out.println("Take location " + studFolder);
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+				}
+				updateOptimalFiles();
+				updateStudentFiles();
+				updateImageLists();
+				EvaluatorReturnValues[] results = evaluate();
+				try {
+					this.feedbackStation.evaluatorReturnValues.put(results);
+					System.out.println("Put eval results");
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 			Platform.exit();
 		});
 	}

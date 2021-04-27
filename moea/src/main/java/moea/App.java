@@ -8,13 +8,8 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import javax.imageio.ImageIO;
 
-/**
- * Hello world!
- *
- */
 public class App {
 
     // Note that the order matters
@@ -28,32 +23,50 @@ public class App {
 
         BufferedImage image = openImage(configParser.imageDirectory);
 
-        NSGA2 nsga2 = new NSGA2(configParser, image);
-        nsga2.runGA();
+        // Capacity 1 because we want a simple, stupid producer/consumer pattern
+        FeedbackStation feedbackStation = new FeedbackStation(1);
 
-        FeedbackStation feedbackStation = new FeedbackStation();
-        Thread evaluatorThread = new Thread(new Evaluator(feedbackStation));
+        Thread gaThread = new Thread(new NSGA2(configParser, image, feedbackStation));
+        Thread evaluatorThread = new Thread(
+                new Evaluator(feedbackStation, "training_images/" + configParser.imageDirectory));
+
+        gaThread.start();
         evaluatorThread.start();
 
-        // Active poll the scores
-        while (feedbackStation.evaluatorReturnValues == null) {
-            continue;
-        }
+        while (true) {
+            EvaluatorReturnValues[] evaluationResults = null;
+            try {
+                evaluationResults = feedbackStation.evaluatorReturnValues.take();
+                System.out.println("Take eval results");
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
 
-        EvaluatorReturnValues bestEvalObject = feedbackStation.evaluatorReturnValues[0];
-        for (EvaluatorReturnValues e : feedbackStation.evaluatorReturnValues) {
-            if (e.score > bestEvalObject.score) {
-                bestEvalObject = e;
+            EvaluatorReturnValues bestEvalObject = evaluationResults[0];
+            for (EvaluatorReturnValues e : evaluationResults) {
+                if (e.score > bestEvalObject.score) {
+                    bestEvalObject = e;
+                }
+            }
+
+            System.out.println("Best score: " + bestEvalObject.score);
+            System.out.println("Solution file: " + bestEvalObject.solutionFile.toPath());
+            System.out.println("GT file: " + bestEvalObject.groundTruthFile.toPath());
+
+            List<Double> scores = Arrays.stream(evaluationResults).map(c -> c.score).collect(Collectors.toList());
+            System.out.println(
+                    "Score statisticss: " + scores.stream().mapToDouble(Double::doubleValue).summaryStatistics());
+
+            if (bestEvalObject.score > 0.75) {
+                feedbackStation.stop = true;
+                System.out.print(ConsoleColors.GREEN);
+                System.out.println("Set stop at score: " + bestEvalObject.score);
+                System.out.print(ConsoleColors.RESET);
+                break;
             }
         }
 
-        System.out.println("Best score: " + bestEvalObject.score);
-        System.out.println("Solution file: " + bestEvalObject.solutionFile.toPath());
-        System.out.println("GT file: " + bestEvalObject.groundTruthFile.toPath());
-
-        List<Double> scores = Arrays.stream(feedbackStation.evaluatorReturnValues).map(c -> c.score).collect(Collectors.toList());
-        System.out
-                .println("Score statisticss: " + scores.stream().mapToDouble(Double::doubleValue).summaryStatistics());
+        gaThread.interrupt();
     }
 
     static BufferedImage openImage(String image_directory) {

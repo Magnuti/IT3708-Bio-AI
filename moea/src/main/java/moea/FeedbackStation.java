@@ -1,9 +1,14 @@
 package moea;
 
-public class FeedbackStation {
-    volatile EvaluatorReturnValues[] evaluatorReturnValues;
+import java.util.concurrent.ArrayBlockingQueue;
 
-    public void reset() {
-        this.evaluatorReturnValues = null;
+public class FeedbackStation {
+    ArrayBlockingQueue<EvaluatorReturnValues[]> evaluatorReturnValues;
+    ArrayBlockingQueue<String> solutionLocations;
+    volatile boolean stop = false;
+
+    public FeedbackStation(int size) {
+        this.evaluatorReturnValues = new ArrayBlockingQueue<>(size);
+        this.solutionLocations = new ArrayBlockingQueue<>(size);
     }
 }

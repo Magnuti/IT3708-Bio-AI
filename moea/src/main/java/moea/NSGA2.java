@@ -14,7 +14,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import moea.App.PixelDirection;
 
-public class NSGA2 {
+public class NSGA2 implements Runnable {
 
     final private BufferedImage image;
     final private int N; // Number of pixels in the image
@@ -34,7 +34,9 @@ public class NSGA2 {
     final private int[][] neighborArrays;
     List<Chromosome> population;
 
-    public NSGA2(ConfigParser configParser, BufferedImage image) {
+    final FeedbackStation feedbackStation;
+
+    public NSGA2(ConfigParser configParser, BufferedImage image, FeedbackStation feedbackStation) {
         this.image = image;
         this.N = image.getHeight() * image.getWidth();
         this.populationSize = configParser.populationSize;
@@ -51,6 +53,8 @@ public class NSGA2 {
 
         this.neighborArrays = Utils.constructNeighborArray(this.image.getWidth(), this.image.getHeight());
         this.edgeValues = Utils.constructEdgeValues(this.image);
+
+        this.feedbackStation = feedbackStation;
 
         MST mst = new MST(edgeValues, neighborArrays);
         initPopulationByMinimumSpanningTree(this.populationSize, mst);
@@ -72,6 +76,11 @@ public class NSGA2 {
                 + this.population.stream().mapToDouble(c -> c.connectivityMeasure).summaryStatistics());
         System.out.println("Overall deviation: "
                 + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
+    }
+
+    @Override
+    public void run() {
+        runGA();
     }
 
     void initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
@@ -299,13 +308,25 @@ public class NSGA2 {
                     + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
 
             assert (this.population.size() == this.populationSize); // TODO temp
-        }
 
-        // Save all images once the GA is finished
-        for (int i = 0; i < this.population.size(); i++) {
-            BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(this.population.get(i),
-                    this.image.getWidth(), this.image.getHeight(), this.neighborArrays);
-            Utils.saveImage(bufferedImage, "last_" + i, "final_images");
+            // Save all images after every generation
+            for (int i = 0; i < this.population.size(); i++) {
+                BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(this.population.get(i),
+                        this.image.getWidth(), this.image.getHeight(), this.neighborArrays);
+                Utils.saveImage(bufferedImage, "last_" + i, "solution_files", "generation_" + generation);
+            }
+
+            if (this.feedbackStation.stop) {
+                System.out.println("Stopped naturally");
+                break;
+            }
+
+            try {
+                this.feedbackStation.solutionLocations.put("output_images/solution_files/generation_" + generation);
+                System.out.println("Put solution location" + "output_images/solution_files/generation_" + generation);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
