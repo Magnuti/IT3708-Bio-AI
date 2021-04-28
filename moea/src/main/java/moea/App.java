@@ -3,8 +3,10 @@ package moea;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,6 +25,12 @@ public class App {
 
         BufferedImage image = openImage(configParser.imageDirectory);
 
+        // TODO pass this to the ones who uses it
+        File outputPath = new File("output_images");
+        if (!outputPath.exists()) {
+            outputPath.mkdir();
+        }
+
         // Capacity 1 because we want a simple, stupid producer/consumer pattern
         FeedbackStation feedbackStation = new FeedbackStation(1);
 
@@ -32,6 +40,8 @@ public class App {
 
         gaThread.start();
         evaluatorThread.start();
+
+        EvaluatorReturnValues finalEvalObject = null;
 
         while (true) {
             EvaluatorReturnValues[] evaluationResults = null;
@@ -62,11 +72,28 @@ public class App {
                 System.out.print(ConsoleColors.GREEN);
                 System.out.println("Set stop at score: " + bestEvalObject.score);
                 System.out.print(ConsoleColors.RESET);
+                finalEvalObject = bestEvalObject;
                 break;
             }
         }
 
         gaThread.interrupt();
+
+        // Save the final images
+        File finalPath = new File(outputPath, "final_images");
+        if (!finalPath.exists()) {
+            finalPath.mkdir();
+        }
+        try {
+            Files.copy(finalEvalObject.groundTruthFile.toPath(), Paths.get(finalPath.getPath(), "GT_image" + ".jpg"),
+                    StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(finalEvalObject.solutionFile.toPath(), Paths.get(finalPath.getPath(), "solution" + ".jpg"),
+                    StandardCopyOption.REPLACE_EXISTING);
+            ImageIO.write(image, "jpg", new File(Paths.get(finalPath.getPath(), "test_image" + ".jpg").toString()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     static BufferedImage openImage(String image_directory) {

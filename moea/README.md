@@ -4,7 +4,7 @@ In this project we implement both a simple genetic algorithm (as in the two prev
 
 ## Getting started
 
-<!-- TODO fix description and add some images -->
+Put a folder with some images in the `training_images/` directory. Out of theese images one has to be named "Test image.jpg" while the ground truth images must start with "GT\_".
 
 ## How to run in VS Code
 

@@ -15,6 +15,7 @@ public class Chromosome {
     double edgeValue;
     double connectivityMeasure;
     double overallDeviation;
+    double segments;
 
     public Chromosome(PixelDirection[] pixelDirections) {
         this.pixelDirections = pixelDirections;
@@ -171,6 +172,7 @@ public class Chromosome {
             }
         }
         this.overallDeviation = deviation;
+        this.segments = segmentCentroids.keySet().size();
     }
 
 }

@@ -22,12 +22,12 @@ public class NSGA2 implements Runnable {
     // Config arguments
     final private int populationSize;
     final private int maxGeneration;
-    final private double stopThreshold;
     final private double crossoverProbability;
     final private double mutationProbability;
     final private int tournamentSize;
     final private boolean verbose;
-    final private int saveInterval;
+    final private int lowerSegmentationCountLimit;
+    final private int upperSegmentationCountLimit;
 
     final private double[][] edgeValues;
     // TODO maybe create a Pixel class which holds the x, y, RGB and segment ID ?
@@ -41,12 +41,12 @@ public class NSGA2 implements Runnable {
         this.N = image.getHeight() * image.getWidth();
         this.populationSize = configParser.populationSize;
         this.maxGeneration = configParser.maxGeneration;
-        this.stopThreshold = configParser.stopThreshold;
         this.crossoverProbability = configParser.crossoverProbability;
         this.mutationProbability = configParser.mutationProbability;
         this.tournamentSize = configParser.tournamentSize;
         this.verbose = configParser.verbose;
-        this.saveInterval = configParser.saveInterval;
+        this.lowerSegmentationCountLimit = configParser.lowerSegmentationCountLimit;
+        this.upperSegmentationCountLimit = configParser.upperSegmentationCountLimit;
 
         // The population consists of several chromosomes
         this.population = new ArrayList<>();
@@ -76,6 +76,7 @@ public class NSGA2 implements Runnable {
                 + this.population.stream().mapToDouble(c -> c.connectivityMeasure).summaryStatistics());
         System.out.println("Overall deviation: "
                 + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
+        System.out.println("Segments: " + this.population.stream().mapToDouble(c -> c.segments).summaryStatistics());
     }
 
     @Override
@@ -306,14 +307,21 @@ public class NSGA2 implements Runnable {
                     + this.population.stream().mapToDouble(c -> c.connectivityMeasure).summaryStatistics());
             System.out.println("Overall deviation: "
                     + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
+            System.out
+                    .println("Segments: " + this.population.stream().mapToDouble(c -> c.segments).summaryStatistics());
 
             assert (this.population.size() == this.populationSize); // TODO temp
 
             // Save all images after every generation
             for (int i = 0; i < this.population.size(); i++) {
-                BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(this.population.get(i),
-                        this.image.getWidth(), this.image.getHeight(), this.neighborArrays);
-                Utils.saveImage(bufferedImage, "last_" + i, "solution_files", "generation_" + generation);
+                Chromosome chromosome = this.population.get(i);
+                if (chromosome.segments < this.lowerSegmentationCountLimit
+                        || chromosome.segments > this.upperSegmentationCountLimit) {
+                    continue;
+                }
+                BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(chromosome, this.image.getWidth(),
+                        this.image.getHeight(), this.neighborArrays);
+                Utils.saveImage(bufferedImage, "last_" + i, "generation_images", "generation_" + generation);
             }
 
             if (this.feedbackStation.stop) {
@@ -322,8 +330,9 @@ public class NSGA2 implements Runnable {
             }
 
             try {
-                this.feedbackStation.solutionLocations.put("output_images/solution_files/generation_" + generation);
-                System.out.println("Put solution location" + "output_images/solution_files/generation_" + generation);
+                this.feedbackStation.solutionLocations.put("output_images/generation_images/generation_" + generation);
+                System.out
+                        .println("Put solution location" + "output_images/generation_images/generation_" + generation);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

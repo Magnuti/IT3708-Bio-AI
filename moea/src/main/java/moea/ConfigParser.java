@@ -19,7 +19,8 @@ public class ConfigParser {
     int tournamentSize;
     int sgaElitismCount;
     boolean verbose;
-    int saveInterval;
+    int lowerSegmentationCountLimit;
+    int upperSegmentationCountLimit;
 
     Yaml yaml = new Yaml();
 
@@ -50,7 +51,8 @@ public class ConfigParser {
             }
 
             this.verbose = (boolean) obj.get("verbose");
-            this.saveInterval = (int) obj.get("save_interval");
+            this.lowerSegmentationCountLimit = (int) obj.get("lower_segmentation_count_limit");
+            this.upperSegmentationCountLimit = (int) obj.get("upper_segmentation_count_limit");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
