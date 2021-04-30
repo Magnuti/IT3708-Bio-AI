@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import moea.App.PixelDirection;
 
@@ -85,15 +86,14 @@ public class NSGA2 implements Runnable {
     List<Chromosome> initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
         System.out.println("Initializing a population of size " + populationSize);
         List<Chromosome> populationSync = Collections.synchronizedList(new ArrayList<>());
-        AtomicCounter createdIndividuals = new AtomicCounter(0);
+        AtomicInteger createdIndividuals = new AtomicInteger(0);
         List<Thread> threads = new ArrayList<>();
         final int threadCount = 24;
         for (int i = 0; i < threadCount; i++) {
             threads.add(new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    while (createdIndividuals.value() < populationSize) {
-                        createdIndividuals.increment();
+                    while (createdIndividuals.getAndIncrement() < populationSize) {
                         int startingNode = ThreadLocalRandom.current().nextInt(N);
                         PixelDirection[] pixelDirections = mst.findDirections(startingNode);
                         Chromosome chromosome = new Chromosome(pixelDirections);
