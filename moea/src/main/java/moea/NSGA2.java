@@ -304,10 +304,10 @@ public class NSGA2 implements Runnable {
                     BufferedImage[] images = Utils.createImagesFromChromosome(chromosome, this.image,
                             this.neighborArrays);
                     // TODO put this path as a constant
-                    Utils.saveImage(images[0], "type_1_" + i, "generation_images", "generation_" + generation,
-                            "type_1");
-                    Utils.saveImage(images[1], "type_2_" + i, "generation_images", "generation_" + generation,
-                            "type_2");
+                    Utils.saveImage(images[0], "type_1_" + i + "_" + (int) chromosome.segments, "generation_images",
+                            "generation_" + generation, "type_1");
+                    Utils.saveImage(images[1], "type_2_" + i + "_" + (int) chromosome.segments, "generation_images",
+                            "generation_" + generation, "type_2");
                 }
             }
 

@@ -9,3 +9,7 @@ Put a folder with some images in the `training_images/` directory. Out of theese
 ## How to run in VS Code
 
 Open the `./mdvrp` folder as a workspace and run the `App.java` file. Note that it must be run from this workspace for relative paths to work.
+
+## Output images
+
+All images are saved as the algorithm runs. When we find out that all images have a lower score than the baseline, that entire directory is deleted along with the images. The generation images have format generation_x_y_z, where x is the type, y is the individ number and z is the number of segments in that image.
