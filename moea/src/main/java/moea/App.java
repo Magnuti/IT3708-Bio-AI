@@ -19,6 +19,10 @@ public class App {
         NONE, RIGHT, LEFT, UP, DOWN, TOP_RIGHT, BOTTOM_RIGHT, TOP_LEFT, BOTTOM_LEFT
     }
 
+    public enum GA_algorithm {
+        NSGA2, SGA
+    }
+
     public static void main(String[] args) {
         ConfigParser configParser = new ConfigParser();
         configParser.parseConfig();
@@ -37,7 +41,13 @@ public class App {
         // Capacity 1 because we want a simple, stupid producer/consumer pattern
         FeedbackStation feedbackStation = new FeedbackStation(1);
 
-        Thread gaThread = new Thread(new NSGA2(configParser, image, feedbackStation));
+        Thread gaThread;
+        if (configParser.gaAlgorithm == GA_algorithm.NSGA2) {
+            gaThread = new Thread(new NSGA2(configParser, image, feedbackStation));
+        } else {
+            gaThread = new Thread(new SGA(configParser, image, feedbackStation));
+        }
+
         Thread evaluatorThread = new Thread(
                 new Evaluator(feedbackStation, "training_images/" + configParser.imageDirectory));
 
@@ -49,9 +59,9 @@ public class App {
         while (!feedbackStation.stop) {
             EvaluatorReturnValues[] evaluationResults = null;
             try {
-                System.out.println("Want to take eval results");
+                // System.out.println("Want to take eval results");
                 evaluationResults = feedbackStation.evaluatorReturnValues.take();
-                System.out.println("Took eval results");
+                // System.out.println("Took eval results");
             } catch (InterruptedException e1) {
                 e1.printStackTrace();
             }

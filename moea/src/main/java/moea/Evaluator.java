@@ -45,9 +45,9 @@ public final class Evaluator implements Runnable {
 		Platform.runLater(() -> {
 			while (!feedbackStation.stop) {
 				try {
-					System.out.println("Want to take location");
+					// System.out.println("Want to take location");
 					this.studFolder = feedbackStation.solutionLocations.take();
-					System.out.println("Took location " + studFolder);
+					// System.out.println("Took location " + studFolder);
 				} catch (InterruptedException e1) {
 					System.out.println("Evaluator was interrupted");
 					break;
@@ -57,9 +57,9 @@ public final class Evaluator implements Runnable {
 				updateImageLists();
 				EvaluatorReturnValues[] results = evaluate();
 				try {
-					System.out.println("Want to put eval results");
+					// System.out.println("Want to put eval results");
 					this.feedbackStation.evaluatorReturnValues.put(results);
-					System.out.println("Did put eval results");
+					// System.out.println("Did put eval results");
 				} catch (InterruptedException e) {
 					System.out.println("Evaluator was interrupted");
 					break;

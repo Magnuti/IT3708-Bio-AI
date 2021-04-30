@@ -10,10 +10,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import moea.App.PixelDirection;
 
 public class NSGA2 implements Runnable {
 
@@ -38,6 +34,7 @@ public class NSGA2 implements Runnable {
     final FeedbackStation feedbackStation;
 
     public NSGA2(ConfigParser configParser, BufferedImage image, FeedbackStation feedbackStation) {
+        System.out.println("Running non-dominated sorting algorithm");
         this.image = image;
         this.N = image.getHeight() * image.getWidth();
         this.populationSize = configParser.populationSize;
@@ -54,10 +51,8 @@ public class NSGA2 implements Runnable {
 
         this.feedbackStation = feedbackStation;
 
-        MST mst = new MST(edgeValues, neighborArrays);
-
-        // The population consists of several chromosomes
-        this.population = initPopulationByMinimumSpanningTree(this.populationSize, mst);
+        this.population = Utils.initPopulationByMinimumSpanningTree(this.populationSize,
+                new MST(edgeValues, neighborArrays), this.N);
 
         // Maybe thread this
         for (int i = 0; i < this.population.size(); i++) {
@@ -81,41 +76,6 @@ public class NSGA2 implements Runnable {
     @Override
     public void run() {
         runGA();
-    }
-
-    List<Chromosome> initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
-        System.out.println("Initializing a population of size " + populationSize);
-        List<Chromosome> populationSync = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger createdIndividuals = new AtomicInteger(0);
-        List<Thread> threads = new ArrayList<>();
-        final int threadCount = 24;
-        for (int i = 0; i < threadCount; i++) {
-            threads.add(new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    while (createdIndividuals.getAndIncrement() < populationSize) {
-                        int startingNode = ThreadLocalRandom.current().nextInt(N);
-                        PixelDirection[] pixelDirections = mst.findDirections(startingNode);
-                        Chromosome chromosome = new Chromosome(pixelDirections);
-                        populationSync.add(chromosome);
-                    }
-                }
-            }));
-        }
-        for (Thread t : threads) {
-            t.start();
-        }
-
-        for (Thread t : threads) {
-            try {
-                t.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        System.out.println("Population initialization complete");
-        assert populationSync.size() == populationSize;
-        return new ArrayList<>(populationSync);
     }
 
     /**

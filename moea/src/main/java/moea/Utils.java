@@ -5,9 +5,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.awt.Color;
 import java.awt.Graphics2D;
 
@@ -16,7 +19,43 @@ import javax.imageio.ImageIO;
 import moea.App.PixelDirection;
 
 public class Utils {
-    public static void initRandomPopulation(List<Chromosome> population, int populationSize, int N) {
+    public static List<Chromosome> initPopulationByMinimumSpanningTree(int populationSize, MST mst, int N) {
+        System.out.println("Initializing a population of size " + populationSize);
+        List<Chromosome> populationSync = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger createdIndividuals = new AtomicInteger(0);
+        List<Thread> threads = new ArrayList<>();
+        final int threadCount = 24;
+        for (int i = 0; i < threadCount; i++) {
+            threads.add(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (createdIndividuals.getAndIncrement() < populationSize) {
+                        int startingNode = ThreadLocalRandom.current().nextInt(N);
+                        PixelDirection[] pixelDirections = mst.findDirections(startingNode);
+                        Chromosome chromosome = new Chromosome(pixelDirections);
+                        populationSync.add(chromosome);
+                    }
+                }
+            }));
+        }
+        for (Thread t : threads) {
+            t.start();
+        }
+
+        for (Thread t : threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("Population initialization complete");
+        assert populationSync.size() == populationSize;
+        return new ArrayList<>(populationSync);
+    }
+
+    public static List<Chromosome> initRandomPopulation(int populationSize, int N) {
+        List<Chromosome> population = new ArrayList<>();
         for (int i = 0; i < populationSize; i++) {
             PixelDirection[] pixelDirections = new PixelDirection[N];
             for (int k = 0; k < N; k++) {
@@ -25,6 +64,7 @@ public class Utils {
             Chromosome chromosome = new Chromosome(pixelDirections);
             population.add(chromosome);
         }
+        return population;
     }
 
     public static Chromosome[] crossover(Chromosome parent1, Chromosome parent2, double crossoverProbability) {

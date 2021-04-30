@@ -5,11 +5,12 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.Map;
-
 import org.yaml.snakeyaml.Yaml;
+import moea.App.GA_algorithm;
 
 public class ConfigParser {
 
+    GA_algorithm gaAlgorithm;
     String imageDirectory;
     int populationSize;
     int maxGeneration;
@@ -29,6 +30,7 @@ public class ConfigParser {
             InputStream inputStream = new FileInputStream(new File("config.yaml"));
             Map<String, Object> obj = yaml.load(inputStream);
 
+            this.gaAlgorithm = GA_algorithm.valueOf(obj.get("ga_algorithm").toString());
             this.imageDirectory = obj.get("image_directory").toString();
             this.populationSize = (int) obj.get("population_size");
             if (this.populationSize % 2 == 1) {
