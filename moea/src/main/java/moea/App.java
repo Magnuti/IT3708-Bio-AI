@@ -23,13 +23,16 @@ public class App {
         ConfigParser configParser = new ConfigParser();
         configParser.parseConfig();
 
-        BufferedImage image = openImage(configParser.imageDirectory);
+        Path imagePath = Paths.get("training_images", configParser.imageDirectory, "Test image.jpg");
+        BufferedImage image = openImage(imagePath);
 
         // TODO pass this to the ones who uses it
         File outputPath = new File("output_images");
-        if (!outputPath.exists()) {
-            outputPath.mkdir();
+        if (outputPath.exists()) {
+            // Start of with an empty output_images directory every time we run
+            deleteDirectory(outputPath);
         }
+        outputPath.mkdir();
 
         // Capacity 1 because we want a simple, stupid producer/consumer pattern
         FeedbackStation feedbackStation = new FeedbackStation(1);
@@ -75,6 +78,9 @@ public class App {
                 finalEvalObject = bestEvalObject;
                 break;
             }
+
+            // Deletes the generation_x directories as we don't need them anymore
+            deleteDirectory(bestEvalObject.solutionFileType1.toPath().getParent().getParent().toFile());
         }
 
         gaThread.interrupt();
@@ -84,9 +90,10 @@ public class App {
         Path solutionFileType2Path = new File(type2Path).toPath();
 
         System.out.println(ConsoleColors.GREEN + "Best score: " + finalEvalObject.score);
-        System.out.println("Solution file type 1: " + finalEvalObject.solutionFileType1.toPath());
-        System.out.println("Solution file type 2: " + solutionFileType2Path);
-        System.out.println("GT file: " + finalEvalObject.groundTruthFile.toPath() + ConsoleColors.RESET);
+        System.out.println("Test image: " + imagePath);
+        System.out.println("Used ground truth: " + finalEvalObject.groundTruthFile.toPath());
+        System.out.println("Solution type 1: " + finalEvalObject.solutionFileType1.toPath());
+        System.out.println("Solution type 2: " + solutionFileType2Path + ConsoleColors.RESET);
 
         // Save the final images
         File finalPath = new File(outputPath, "final_images");
@@ -107,13 +114,24 @@ public class App {
 
     }
 
-    static BufferedImage openImage(String image_directory) {
-        Path path = Paths.get("training_images", image_directory, "Test image.jpg");
+    // Deletes a directory and all its content.
+    // Taken from https://www.baeldung.com/java-delete-directory
+    static boolean deleteDirectory(File directoryToBeDeleted) {
+        File[] allContents = directoryToBeDeleted.listFiles();
+        if (allContents != null) {
+            for (File file : allContents) {
+                deleteDirectory(file);
+            }
+        }
+        return directoryToBeDeleted.delete();
+    }
+
+    static BufferedImage openImage(Path imagePath) {
         try {
-            return ImageIO.read(new File(path.toString()));
+            return ImageIO.read(imagePath.toFile());
         } catch (IOException e) {
             e.printStackTrace();
-            throw new Error("Cannot open the image: " + path.toString());
+            throw new Error("Cannot open the image: " + imagePath);
         }
     }
 }
