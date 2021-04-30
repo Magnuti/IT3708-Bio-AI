@@ -315,29 +315,35 @@ public class NSGA2 implements Runnable {
             // Save all images after every generation
             for (int i = 0; i < this.population.size(); i++) {
                 Chromosome chromosome = this.population.get(i);
-                if (chromosome.segments < this.lowerSegmentationCountLimit
-                        || chromosome.segments > this.upperSegmentationCountLimit) {
-                    continue;
+                if (chromosome.segments >= this.lowerSegmentationCountLimit
+                        && chromosome.segments <= this.upperSegmentationCountLimit) {
+                    BufferedImage[] images = Utils.createImagesFromChromosome(chromosome, this.image,
+                            this.neighborArrays);
+                    // TODO put this path as a constant
+                    Utils.saveImage(images[0], "type_1_" + i, "generation_images", "generation_" + generation,
+                            "type_1");
+                    Utils.saveImage(images[1], "type_2_" + i, "generation_images", "generation_" + generation,
+                            "type_2");
                 }
-                BufferedImage[] images = Utils.createImagesFromChromosome(chromosome, this.image, this.neighborArrays);
-                // TODO put this path as a constant
-                Utils.saveImage(images[0], "type_1_" + i, "generation_images", "generation_" + generation, "type_1");
-                Utils.saveImage(images[1], "type_2_" + i, "generation_images", "generation_" + generation, "type_2");
             }
 
             if (this.feedbackStation.stop) {
-                System.out.println("Stopped naturally");
                 break;
             }
 
             try {
+                System.out.println("Wanting to put solution location: " + "output_images/generation_images/generation_"
+                        + generation);
                 this.feedbackStation.solutionLocations
                         .put("output_images/generation_images/generation_" + generation + "/type_1");
-                System.out
-                        .println("Put solution location" + "output_images/generation_images/generation_" + generation);
+                System.out.println(
+                        "Did put solution location: " + "output_images/generation_images/generation_" + generation);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                System.out.println("NSGA was interrupted");
+                break;
             }
         }
+        this.feedbackStation.stop = true;
+        System.out.println("NSGA finished");
     }
 }

@@ -46,13 +46,17 @@ public class App {
 
         EvaluatorReturnValues finalEvalObject = null;
 
-        while (true) {
+        while (!feedbackStation.stop) {
             EvaluatorReturnValues[] evaluationResults = null;
             try {
+                System.out.println("Want to take eval results");
                 evaluationResults = feedbackStation.evaluatorReturnValues.take();
-                System.out.println("Take eval results");
+                System.out.println("Took eval results");
             } catch (InterruptedException e1) {
                 e1.printStackTrace();
+            }
+            if (evaluationResults.length == 0) {
+                continue;
             }
 
             EvaluatorReturnValues bestEvalObject = evaluationResults[0];
@@ -70,12 +74,15 @@ public class App {
             System.out.println(
                     "Score statisticss: " + scores.stream().mapToDouble(Double::doubleValue).summaryStatistics());
 
+            // Early stopping
             if (bestEvalObject.score > configParser.stopThreshold) {
                 feedbackStation.stop = true;
                 System.out.print(ConsoleColors.GREEN);
                 System.out.println("Set stop at score: " + bestEvalObject.score);
                 System.out.print(ConsoleColors.RESET);
                 finalEvalObject = bestEvalObject;
+                evaluatorThread.interrupt();
+                gaThread.interrupt();
                 break;
             }
 
@@ -83,35 +90,48 @@ public class App {
             deleteDirectory(bestEvalObject.solutionFileType1.toPath().getParent().getParent().toFile());
         }
 
-        gaThread.interrupt();
-
-        String type2Path = finalEvalObject.solutionFileType1.getPath();
-        type2Path = type2Path.replace("type_1", "type_2");
-        Path solutionFileType2Path = new File(type2Path).toPath();
-
-        System.out.println(ConsoleColors.GREEN + "Best score: " + finalEvalObject.score);
-        System.out.println("Test image: " + imagePath);
-        System.out.println("Used ground truth: " + finalEvalObject.groundTruthFile.toPath());
-        System.out.println("Solution type 1: " + finalEvalObject.solutionFileType1.toPath());
-        System.out.println("Solution type 2: " + solutionFileType2Path + ConsoleColors.RESET);
-
-        // Save the final images
-        File finalPath = new File(outputPath, "final_images");
-        if (!finalPath.exists()) {
-            finalPath.mkdir();
-        }
         try {
-            Files.copy(finalEvalObject.groundTruthFile.toPath(), Paths.get(finalPath.getPath(), "GT_image" + ".jpg"),
-                    StandardCopyOption.REPLACE_EXISTING);
-            Files.copy(finalEvalObject.solutionFileType1.toPath(),
-                    Paths.get(finalPath.getPath(), "solution_type_1" + ".jpg"), StandardCopyOption.REPLACE_EXISTING);
-            Files.copy(solutionFileType2Path, Paths.get(finalPath.getPath(), "solution_type_2" + ".jpg"),
-                    StandardCopyOption.REPLACE_EXISTING);
-            ImageIO.write(image, "jpg", new File(Paths.get(finalPath.getPath(), "test_image" + ".jpg").toString()));
-        } catch (IOException e) {
-            e.printStackTrace();
+            gaThread.join();
+            evaluatorThread.join();
+        } catch (InterruptedException e1) {
+            e1.printStackTrace();
         }
 
+        if (finalEvalObject == null) {
+            System.out.println(
+                    ConsoleColors.YELLOW + "Did not find a solution that reached the threshold" + ConsoleColors.RESET);
+        } else {
+            String type2Path = finalEvalObject.solutionFileType1.getPath();
+            type2Path = type2Path.replace("type_1", "type_2");
+            Path solutionFileType2Path = new File(type2Path).toPath();
+
+            System.out.println(ConsoleColors.GREEN + "Best score: " + finalEvalObject.score);
+            System.out.println("Test image: " + imagePath);
+            System.out.println("Used ground truth: " + finalEvalObject.groundTruthFile.toPath());
+            System.out.println("Solution type 1: " + finalEvalObject.solutionFileType1.toPath());
+            System.out.println("Solution type 2: " + solutionFileType2Path + ConsoleColors.RESET);
+
+            // Save the final images
+            File finalPath = new File(outputPath, "final_images");
+            if (!finalPath.exists()) {
+                finalPath.mkdir();
+            }
+            try {
+                Files.copy(finalEvalObject.groundTruthFile.toPath(),
+                        Paths.get(finalPath.getPath(), "GT_image" + ".jpg"), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(finalEvalObject.solutionFileType1.toPath(),
+                        Paths.get(finalPath.getPath(), "solution_type_1" + ".jpg"),
+                        StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(solutionFileType2Path, Paths.get(finalPath.getPath(), "solution_type_2" + ".jpg"),
+                        StandardCopyOption.REPLACE_EXISTING);
+                ImageIO.write(image, "jpg", new File(Paths.get(finalPath.getPath(), "test_image" + ".jpg").toString()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        // Somehow I can't seem to stop the evaluator thread always, it may be some
+        // JavaFX thread crap. So, we exit the program here manually.
+        System.exit(0);
     }
 
     // Deletes a directory and all its content.

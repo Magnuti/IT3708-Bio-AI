@@ -45,23 +45,27 @@ public final class Evaluator implements Runnable {
 		Platform.runLater(() -> {
 			while (!feedbackStation.stop) {
 				try {
-					// this.studFolder = feedbackStation.popSolutionLocation();
+					System.out.println("Want to take location");
 					this.studFolder = feedbackStation.solutionLocations.take();
-					System.out.println("Take location " + studFolder);
+					System.out.println("Took location " + studFolder);
 				} catch (InterruptedException e1) {
-					e1.printStackTrace();
+					System.out.println("Evaluator was interrupted");
+					break;
 				}
 				updateOptimalFiles();
 				updateStudentFiles();
 				updateImageLists();
 				EvaluatorReturnValues[] results = evaluate();
 				try {
+					System.out.println("Want to put eval results");
 					this.feedbackStation.evaluatorReturnValues.put(results);
-					System.out.println("Put eval results");
+					System.out.println("Did put eval results");
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					System.out.println("Evaluator was interrupted");
+					break;
 				}
 			}
+			System.out.println("Evaluator finished");
 			Platform.exit();
 		});
 	}
@@ -156,6 +160,11 @@ public final class Evaluator implements Runnable {
 
 	private List<File> getSolutionFiles(String directory) {
 		File dir = new File(directory);
+		if (!dir.exists()) {
+			// This happens when all the individuals had too few/many segments, so the
+			// generation_x directory does not even exist.
+			return new ArrayList<File>();
+		}
 		return Arrays.asList(dir.listFiles());
 	}
 
