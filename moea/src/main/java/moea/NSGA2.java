@@ -48,19 +48,17 @@ public class NSGA2 implements Runnable {
         this.lowerSegmentationCountLimit = configParser.lowerSegmentationCountLimit;
         this.upperSegmentationCountLimit = configParser.upperSegmentationCountLimit;
 
-        // The population consists of several chromosomes
-        this.population = new ArrayList<>();
-
         this.neighborArrays = Utils.constructNeighborArray(this.image.getWidth(), this.image.getHeight());
         this.edgeValues = Utils.constructEdgeValues(this.image);
 
         this.feedbackStation = feedbackStation;
 
         MST mst = new MST(edgeValues, neighborArrays);
-        initPopulationByMinimumSpanningTree(this.populationSize, mst);
-        // initRandomPopulation(configParser.populationSize);
 
-        // TODO multi-thread
+        // The population consists of several chromosomes
+        this.population = initPopulationByMinimumSpanningTree(this.populationSize, mst);
+
+        // Maybe thread this
         for (int i = 0; i < this.population.size(); i++) {
             Chromosome chromosome = this.population.get(i);
             chromosome.recalculateObjectives(this.N, this.neighborArrays, this.image);
@@ -84,14 +82,40 @@ public class NSGA2 implements Runnable {
         runGA();
     }
 
-    void initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
-        for (int i = 0; i < populationSize; i++) {
-            System.out.println("Init poopulation for chromosome: " + i);
-            int startingNode = ThreadLocalRandom.current().nextInt(this.N);
-            PixelDirection[] pixelDirections = mst.findDirections(startingNode);
-            Chromosome chromosome = new Chromosome(pixelDirections);
-            this.population.add(chromosome);
+    List<Chromosome> initPopulationByMinimumSpanningTree(int populationSize, MST mst) {
+        System.out.println("Initializing a population of size " + populationSize);
+        List<Chromosome> populationSync = Collections.synchronizedList(new ArrayList<>());
+        AtomicCounter createdIndividuals = new AtomicCounter(0);
+        List<Thread> threads = new ArrayList<>();
+        final int threadCount = 24;
+        for (int i = 0; i < threadCount; i++) {
+            threads.add(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (createdIndividuals.value() < populationSize) {
+                        createdIndividuals.increment();
+                        int startingNode = ThreadLocalRandom.current().nextInt(N);
+                        PixelDirection[] pixelDirections = mst.findDirections(startingNode);
+                        Chromosome chromosome = new Chromosome(pixelDirections);
+                        populationSync.add(chromosome);
+                    }
+                }
+            }));
         }
+        for (Thread t : threads) {
+            t.start();
+        }
+
+        for (Thread t : threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("Population initialization complete");
+        assert populationSync.size() == populationSize;
+        return new ArrayList<>(populationSync);
     }
 
     /**
