@@ -65,10 +65,10 @@ public class NSGA2 implements Runnable {
             Chromosome chromosome = this.population.get(i);
             chromosome.recalculateObjectives(this.N, this.neighborArrays, this.image);
 
-            BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(chromosome, this.image.getWidth(),
-                    this.image.getHeight(), this.neighborArrays);
+            BufferedImage[] images = Utils.createImagesFromChromosome(chromosome, this.image, this.neighborArrays);
+            BufferedImage type1Image = images[0];
 
-            Utils.saveImage(bufferedImage, Integer.toString(i), "initial_images");
+            Utils.saveImage(type1Image, Integer.toString(i), "initial_images");
         }
 
         System.out.println("Edge value: " + this.population.stream().mapToDouble(c -> c.edgeValue).summaryStatistics());
@@ -319,9 +319,10 @@ public class NSGA2 implements Runnable {
                         || chromosome.segments > this.upperSegmentationCountLimit) {
                     continue;
                 }
-                BufferedImage bufferedImage = Utils.createBufferedImageFromChromosome(chromosome, this.image.getWidth(),
-                        this.image.getHeight(), this.neighborArrays);
-                Utils.saveImage(bufferedImage, "last_" + i, "generation_images", "generation_" + generation);
+                BufferedImage[] images = Utils.createImagesFromChromosome(chromosome, this.image, this.neighborArrays);
+                // TODO put this path as a constant
+                Utils.saveImage(images[0], "type_1_" + i, "generation_images", "generation_" + generation, "type_1");
+                Utils.saveImage(images[1], "type_2_" + i, "generation_images", "generation_" + generation, "type_2");
             }
 
             if (this.feedbackStation.stop) {
@@ -330,7 +331,8 @@ public class NSGA2 implements Runnable {
             }
 
             try {
-                this.feedbackStation.solutionLocations.put("output_images/generation_images/generation_" + generation);
+                this.feedbackStation.solutionLocations
+                        .put("output_images/generation_images/generation_" + generation + "/type_1");
                 System.out
                         .println("Put solution location" + "output_images/generation_images/generation_" + generation);
             } catch (InterruptedException e) {

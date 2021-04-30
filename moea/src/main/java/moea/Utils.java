@@ -200,7 +200,7 @@ public class Utils {
     }
 
     public static void saveImage(BufferedImage bufferedImage, String name, String... outputPaths) {
-        File raw_path = new File("output_images");
+        File raw_path = new File("output_images"); // TODO take this as an param
         if (!raw_path.exists()) {
             raw_path.mkdir();
         }
@@ -220,34 +220,43 @@ public class Utils {
         }
     }
 
-    public static BufferedImage createBufferedImageFromChromosome(Chromosome chromosome, int imageWidth,
-            int imageHeight, int[][] neighborArrays) {
-        BufferedImage bufferedImage = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_BYTE_BINARY);
+    /**
+     * Create both type 1 and type 2 images.
+     */
+    public static BufferedImage[] createImagesFromChromosome(Chromosome chromosome, BufferedImage image,
+            int[][] neighborArrays) {
+        BufferedImage type1 = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_BINARY);
+        BufferedImage type2 = new BufferedImage(image.getWidth(), image.getHeight(), image.getType());
 
-        // Initialize the entire image as white
-        Graphics2D graphics = bufferedImage.createGraphics();
+        // Initialize the entire type 1 image as white
+        Graphics2D graphics = type1.createGraphics();
         graphics.setPaint(new Color(255, 255, 255));
-        graphics.fillRect(0, 0, imageWidth, imageHeight);
+        graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
         graphics.dispose();
 
-        // TODO create both type 1 and ype
+        // The type 2 image is just a copy of the original image
+        graphics = type2.createGraphics();
+        graphics.drawImage(image, 0, 0, null);
+        graphics.dispose();
 
         final int BLACK = new Color(0, 0, 0).getRGB();
+        final int GREEN = new Color(50, 255, 0).getRGB();
 
-        for (int pixel = 0; pixel < imageWidth * imageHeight; pixel++) {
+        for (int pixel = 0; pixel < image.getWidth() * image.getHeight(); pixel++) {
             for (int neighborIndex = 1; neighborIndex < neighborArrays[pixel].length; neighborIndex++) {
                 int neighborPixel = neighborArrays[pixel][neighborIndex];
                 if (neighborPixel == -1
                         || chromosome.indexToSegmentIds[pixel] != chromosome.indexToSegmentIds[neighborPixel]) {
                     // Set the pixel to black if it is on the image border or the segment border
-                    int y = pixel / imageWidth;
-                    int x = pixel % imageWidth;
-                    bufferedImage.setRGB(x, y, BLACK);
+                    int y = pixel / image.getWidth();
+                    int x = pixel % image.getWidth();
+                    type1.setRGB(x, y, BLACK);
+                    type2.setRGB(x, y, GREEN);
                     break; // No need to check the rest of the neighbors for this pixel
                 }
             }
         }
 
-        return bufferedImage;
+        return new BufferedImage[] { type1, type2 };
     }
 }

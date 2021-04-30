@@ -4,12 +4,12 @@ import java.io.File;
 
 public class EvaluatorReturnValues {
     final File groundTruthFile;
-    final File solutionFile;
+    final File solutionFileType1;
     final double score;
 
-    public EvaluatorReturnValues(File groundTruthFile, File solutionFile, double score) {
+    public EvaluatorReturnValues(File groundTruthFile, File solutionFileType1, double score) {
         this.groundTruthFile = groundTruthFile;
-        this.solutionFile = solutionFile;
+        this.solutionFileType1 = solutionFileType1;
         this.score = score;
     }
 }

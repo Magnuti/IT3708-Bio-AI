@@ -60,14 +60,14 @@ public class App {
             }
 
             System.out.println("Best score: " + bestEvalObject.score);
-            System.out.println("Solution file: " + bestEvalObject.solutionFile.toPath());
+            System.out.println("Solution file: " + bestEvalObject.solutionFileType1.toPath());
             System.out.println("GT file: " + bestEvalObject.groundTruthFile.toPath());
 
             List<Double> scores = Arrays.stream(evaluationResults).map(c -> c.score).collect(Collectors.toList());
             System.out.println(
                     "Score statisticss: " + scores.stream().mapToDouble(Double::doubleValue).summaryStatistics());
 
-            if (bestEvalObject.score > 0.75) {
+            if (bestEvalObject.score > configParser.stopThreshold) {
                 feedbackStation.stop = true;
                 System.out.print(ConsoleColors.GREEN);
                 System.out.println("Set stop at score: " + bestEvalObject.score);
@@ -79,6 +79,15 @@ public class App {
 
         gaThread.interrupt();
 
+        String type2Path = finalEvalObject.solutionFileType1.getPath();
+        type2Path = type2Path.replace("type_1", "type_2");
+        Path solutionFileType2Path = new File(type2Path).toPath();
+
+        System.out.println(ConsoleColors.GREEN + "Best score: " + finalEvalObject.score);
+        System.out.println("Solution file type 1: " + finalEvalObject.solutionFileType1.toPath());
+        System.out.println("Solution file type 2: " + solutionFileType2Path);
+        System.out.println("GT file: " + finalEvalObject.groundTruthFile.toPath() + ConsoleColors.RESET);
+
         // Save the final images
         File finalPath = new File(outputPath, "final_images");
         if (!finalPath.exists()) {
@@ -87,7 +96,9 @@ public class App {
         try {
             Files.copy(finalEvalObject.groundTruthFile.toPath(), Paths.get(finalPath.getPath(), "GT_image" + ".jpg"),
                     StandardCopyOption.REPLACE_EXISTING);
-            Files.copy(finalEvalObject.solutionFile.toPath(), Paths.get(finalPath.getPath(), "solution" + ".jpg"),
+            Files.copy(finalEvalObject.solutionFileType1.toPath(),
+                    Paths.get(finalPath.getPath(), "solution_type_1" + ".jpg"), StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(solutionFileType2Path, Paths.get(finalPath.getPath(), "solution_type_2" + ".jpg"),
                     StandardCopyOption.REPLACE_EXISTING);
             ImageIO.write(image, "jpg", new File(Paths.get(finalPath.getPath(), "test_image" + ".jpg").toString()));
         } catch (IOException e) {
