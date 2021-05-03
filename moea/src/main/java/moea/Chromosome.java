@@ -15,7 +15,7 @@ public class Chromosome {
     double edgeValue;
     double connectivityMeasure;
     double overallDeviation;
-    double segments;
+    int segments;
 
     public Chromosome(PixelDirection[] pixelDirections) {
         this.pixelDirections = pixelDirections;

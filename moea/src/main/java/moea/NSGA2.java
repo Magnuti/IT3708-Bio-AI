@@ -70,7 +70,7 @@ public class NSGA2 implements Runnable {
                 + this.population.stream().mapToDouble(c -> c.connectivityMeasure).summaryStatistics());
         System.out.println("Overall deviation: "
                 + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
-        System.out.println("Segments: " + this.population.stream().mapToDouble(c -> c.segments).summaryStatistics());
+        System.out.println("Segments: " + this.population.stream().mapToInt(c -> c.segments).summaryStatistics());
     }
 
     @Override
@@ -292,7 +292,7 @@ public class NSGA2 implements Runnable {
             System.out.println("Overall deviation: "
                     + this.population.stream().mapToDouble(c -> c.overallDeviation).summaryStatistics());
             System.out
-                    .println("Segments: " + this.population.stream().mapToDouble(c -> c.segments).summaryStatistics());
+                    .println("Segments: " + this.population.stream().mapToInt(c -> c.segments).summaryStatistics());
 
             assert (this.population.size() == this.populationSize); // TODO temp
 
@@ -304,9 +304,9 @@ public class NSGA2 implements Runnable {
                     BufferedImage[] images = Utils.createImagesFromChromosome(chromosome, this.image,
                             this.neighborArrays);
                     // TODO put this path as a constant
-                    Utils.saveImage(images[0], "type_1_" + i + "_" + (int) chromosome.segments, "generation_images",
+                    Utils.saveImage(images[0], "type_1_" + i + "_" + chromosome.segments, "generation_images",
                             "generation_" + generation, "type_1");
-                    Utils.saveImage(images[1], "type_2_" + i + "_" + (int) chromosome.segments, "generation_images",
+                    Utils.saveImage(images[1], "type_2_" + i + "_" + chromosome.segments, "generation_images",
                             "generation_" + generation, "type_2");
                 }
             }
