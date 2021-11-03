@@ -557,6 +557,10 @@ public class Solver extends Thread {
                 this.saveBest();
             }
 
+            // if (generation % 5 == 0) {
+            //     saveThisGeneration(generation);
+            // }
+
             // Run every 50th time for speedup
             if (generation % 100 == 0 && generation > 0) {
                 double bestLegalFitness = Double.POSITIVE_INFINITY;
@@ -623,5 +627,61 @@ public class Solver extends Thread {
     @Override
     public String toString() {
         return Helper.getClassValuesAsString(this);
+    }
+
+    private void saveThisGeneration(int generation) {
+        Collections.sort(this.population, (a, b) -> Double.compare(a.fitness, b.fitness));
+        // List<Chromosome> legalPopulation = this.population.stream().filter(x ->
+        // x.tooManyRoutes == 0)
+        // .collect(Collectors.toList());
+        // if (legalPopulation.isEmpty()) {
+        // return;
+        // }
+
+        // List<Depot> depots = legalPopulation.get(0).depots;
+        List<Depot> depots = population.get(0).depots;
+
+        try {
+            Path path = Paths.get("generations");
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+            }
+            path = Paths.get(path.toString(), String.format("%d.res", generation));
+            if (!Files.exists(path)) {
+                Files.createFile(path);
+            }
+            FileWriter fr = new FileWriter(path.toString());
+            double totalRouteLength = 0.0;
+            for (Depot depot : depots) {
+                totalRouteLength += depot.routes.stream().map(x -> x.routeLength).reduce(0.0, Double::sum);
+            }
+            fr.write(Helper.roundDouble(totalRouteLength));
+            fr.write(System.lineSeparator());
+            for (Depot depot : depots) {
+                for (int i = 0; i < depot.routes.size(); i++) {
+                    Route route = depot.routes.get(i);
+                    fr.write(Integer.toString(depot.getId()));
+                    fr.write("\t");
+                    fr.write(Integer.toString(i + 1));
+                    fr.write("\t");
+                    fr.write(Helper.roundDouble(route.routeLength));
+                    fr.write("\t");
+                    fr.write(
+                            Integer.toString(route.customers.stream().map(x -> x.getDemand()).reduce(0, Integer::sum)));
+                    fr.write("\t");
+                    // Prepend the depot ID for compatibility reasons
+                    fr.write(Integer.toString(depot.getId()));
+                    fr.write("\t");
+                    for (Customer c : route.customers) {
+                        fr.write(Integer.toString(c.getId()));
+                        fr.write(" ");
+                    }
+                    fr.write(System.lineSeparator());
+                }
+            }
+            fr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
